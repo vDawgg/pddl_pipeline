@@ -1,0 +1,38 @@
+---
+repos:
+  - repo: local
+    hooks:
+      - id: uv-sync
+        name: uv-sync
+        description: sync uv dependencies
+        entry: uv sync
+        language: python
+        pass_filenames: false
+        stages: [post-checkout, post-merge]
+        always_run: true
+      - id: ruff-lint
+        name: ruff-lint
+        entry: uv format --check
+        language: system
+        types_or: [python]
+        require_serial: true # run once for all files
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff-format
+        entry: uv format
+        language: system
+        types_or: [python]
+        require_serial: true # run once for all files
+        pass_filenames: false
+      - id: pyright
+        name: pyright
+        entry: uv run pyright
+        language: system
+        types: [python]
+        require_serial: true # run once for all files
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: debug-statements

@@ -1,6 +1,5 @@
-def main():
-    print("Hello from pddl-pipeline!")
+from src.pipeline.pipeline import simple_pipeline
 
 
 if __name__ == "__main__":
-    main()
+    print(simple_pipeline())
