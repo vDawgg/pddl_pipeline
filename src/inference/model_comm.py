@@ -43,7 +43,8 @@ def make_request(
     format: Type[T] | None = None,
     imgs: list[str] | None = None,
 ) -> T | str | None:
-    model_name = "Qwen/Qwen3-VL-8B-Instruct"
+    # TODO: This should be settable as well -> Ideally via an enum
+    model_name = "Qwen/Qwen3-VL-4B-Instruct"
     client = openai.OpenAI(
         base_url=os.environ.get("SERVER_ADDRESS", "http://localhost:8080/v1"),
         api_key="sk-no-key-required",
