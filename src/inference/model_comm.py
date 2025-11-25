@@ -6,6 +6,18 @@ import openai
 from pydantic import BaseModel
 
 
+def make_assistant_message(message: str) -> dict:
+    return {
+        "role": "assistant",
+        "content": [
+            {
+                "type": "text",
+                "text": message,
+            },
+        ],
+    }
+
+
 def make_user_message(message: str) -> dict:
     return {
         "role": "user",
@@ -42,7 +54,7 @@ def make_request(
     messages: list[Any] = [],
     format: Type[T] | None = None,
     imgs: list[str] | None = None,
-) -> T | str | None:
+) -> tuple[T | str, list[Any]]:
     # TODO: This should be settable as well -> Ideally via an enum
     model_name = "Qwen/Qwen3-VL-4B-Instruct"
     client = openai.OpenAI(
@@ -61,10 +73,22 @@ def make_request(
             messages=messages,
             response_format=format,
         )
-        return response.choices[0].message.parsed
+        res = response.choices[0].message.parsed
+        assert res
+        messages.append(make_assistant_message(res.model_dump_json()))
+        return res, messages
     else:
         response = client.chat.completions.create(
             model=model_name,
             messages=messages,
+            # TODO: If we actually use multiple models, these configs should
+            #       Be easilly settable.
+            temperature=0.7,
+            presence_penalty=1.5,
+            frequency_penalty=1.0,
+            top_p=0.8,
         )
-        return response.choices[0].message.content
+        res = response.choices[0].message.content
+        assert res
+        messages.append(make_assistant_message(res))
+        return res, messages
