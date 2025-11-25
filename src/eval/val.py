@@ -3,8 +3,7 @@ from subprocess import PIPE, run
 
 def get_syntax_mistakes_domain(domain_file: str) -> str:
     process = run(
-        ["./VAL/Parser", domain_file],
-        check=True,
+        ["Parser", domain_file],
         stdout=PIPE,
         text=True,
     )
@@ -15,8 +14,7 @@ def get_syntax_mistakes_domain(domain_file: str) -> str:
 
 def get_syntax_mistakes_problem(domain_file: str, problem_file: str) -> str:
     process = run(
-        ["./VAL/Parser", domain_file, problem_file],
-        check=True,
+        ["Parser", domain_file, problem_file],
         stdout=PIPE,
         text=True,
     )
