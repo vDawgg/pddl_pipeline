@@ -12,6 +12,7 @@ services:
       - "bitsandbytes"
       - "--max_model_len"
       - "12800"
+      - "--enforce-eager"
     deploy:
       resources:
         reservations:
