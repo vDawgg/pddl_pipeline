@@ -56,7 +56,7 @@ def make_request(
     imgs: list[str] | None = None,
 ) -> tuple[T | str, list[Any]]:
     # TODO: This should be settable as well -> Ideally via an enum
-    model_name = "Qwen/Qwen3-VL-4B-Instruct"
+    model_name = "Qwen/Qwen3-VL-8B-Instruct"
     client = openai.OpenAI(
         base_url=os.environ.get("SERVER_ADDRESS", "http://localhost:8080/v1"),
         api_key="sk-no-key-required",
@@ -81,12 +81,6 @@ def make_request(
         response = client.chat.completions.create(
             model=model_name,
             messages=messages,
-            # TODO: If we actually use multiple models, these configs should
-            #       Be easilly settable.
-            temperature=0.7,
-            presence_penalty=1.5,
-            frequency_penalty=1.0,
-            top_p=0.8,
         )
         res = response.choices[0].message.content
         assert res

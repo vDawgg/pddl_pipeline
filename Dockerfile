@@ -17,7 +17,7 @@ FROM val AS fast_downward
 # FastDownward installation
 RUN apt install curl
 RUN curl https://www.fast-downward.org/latest/files/release24.06/fast-downward-24.06.1.tar.gz -o fast_downward.tar.gz
-RUN tar -xvzf fast_downward.tar.gz
+RUN tar -xvf fast_downward.tar.gz
 WORKDIR /fast-downward-24.06.1
 RUN uv run python ./build.py
 
