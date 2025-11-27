@@ -1,9 +1,10 @@
 import os
-
 from typing import Any, Type, TypeVar
 
 import openai
 from pydantic import BaseModel
+
+from src.inference import Models
 
 
 def make_assistant_message(message: str) -> dict:
@@ -51,12 +52,13 @@ T = TypeVar("T", bound=BaseModel)
 
 def make_request(
     input_prompt: str,
-    messages: list[Any] = [],
+    model_name: Models,
+    messages: list[Any] | None = None,
     format: Type[T] | None = None,
     imgs: list[str] | None = None,
 ) -> tuple[T | str, list[Any]]:
-    # TODO: This should be settable as well -> Ideally via an enum
-    model_name = "Qwen/Qwen3-VL-8B-Instruct"
+    messages = messages or []
+
     client = openai.OpenAI(
         base_url=os.environ.get("SERVER_ADDRESS", "http://localhost:8080/v1"),
         api_key="sk-no-key-required",

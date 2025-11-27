@@ -1,11 +1,12 @@
 from src.eval.fast_downward import generate_plan
 from src.eval.val import get_syntax_mistakes_problem, get_syntax_mistakes_domain
-from src.pipeline.pipeline import baseline
+from src.inference import Models
+from src.pipeline.baseline import Baseline
 from src.utils.io import write_temp_pddl_file
 
 
 if __name__ == "__main__":
-    domain, problem = baseline()
+    domain, problem = Baseline(Models.QWEN_3_VL_8B).run()
     print("# Domain\n\n")
     print(domain)
     domain_file = write_temp_pddl_file(domain)

@@ -239,6 +239,7 @@ dependencies = [
     { name = "pre-commit" },
     { name = "pydantic" },
     { name = "pyright" },
+    { name = "tqdm" },
 ]
 
 [package.metadata]
@@ -247,6 +248,7 @@ requires-dist = [
     { name = "pre-commit", specifier = ">=4.4.0" },
     { name = "pydantic", specifier = ">=2.12.4" },
     { name = "pyright", specifier = ">=1.1.407" },
+    { name = "tqdm", specifier = ">=4.67.1" },
 ]
 
 [[package]]
