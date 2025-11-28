@@ -26,11 +26,12 @@ if __name__ == "__main__":
     pipeline = args.pipeline
     model = args.model
 
-    syntax_domain, syntax_problem, plans = run_eval(
+    model_failures, syntax_domain, syntax_problem, failed_plans = run_eval(
         iterations, pipelines[pipeline](model)
     )
     print("# Evaluation Results:")
     print("Total number of iterations:", iterations)
+    print("Number of generation failures:", model_failures)
     print("Number of syntactically incorrect domains:", syntax_domain)
     print("Number of syntactically incorrect problems:", syntax_problem)
-    print("Number of unsolvable problems:", plans)
+    print("Number of unsolvable problems:", failed_plans)

@@ -3,7 +3,7 @@ import re
 from typing import Tuple
 
 
-class ErrorInfo:
+class VALErrorInfo:
     def __init__(self, num_errors: int, num_warnings: int, errors: list[str]):
         self.num_errors = num_errors
         self.num_warnings = num_warnings
@@ -30,10 +30,10 @@ def make_error_info(parser_output: str):
                 error_type = match.group(2)
                 message = match.group(3)
                 errors.append(f"line: {line_num}: {error_type}: {message}")
-    return ErrorInfo(num_errors, num_warnings, errors)
+    return VALErrorInfo(num_errors, num_warnings, errors)
 
 
-def get_syntax_mistakes_domain(domain_file: str) -> ErrorInfo:
+def get_syntax_mistakes_domain(domain_file: str) -> VALErrorInfo:
     process = run(
         ["Parser", domain_file],
         stdout=PIPE,
@@ -42,7 +42,7 @@ def get_syntax_mistakes_domain(domain_file: str) -> ErrorInfo:
     return make_error_info(process.stdout)
 
 
-def get_syntax_mistakes_problem(domain_file: str, problem_file: str) -> ErrorInfo:
+def get_syntax_mistakes_problem(domain_file: str, problem_file: str) -> VALErrorInfo:
     process = run(
         ["Parser", domain_file, problem_file],
         stdout=PIPE,

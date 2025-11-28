@@ -1,4 +1,4 @@
-from src.eval.fast_downward import generate_plan
+from src.eval.fast_downward import generate_plan, FDErrorInfo
 from src.eval.val import get_syntax_mistakes_problem, get_syntax_mistakes_domain
 from src.inference import Models
 from src.pipeline.baseline import Baseline
@@ -15,6 +15,7 @@ if __name__ == "__main__":
     print("Num errors:", domain_error_info.num_errors)
     print("Num warnings:", domain_error_info.num_warnings)
     print("Errors: ", domain_error_info.errors)
+
     print("\n\n# Problem\n\n")
     print(problem)
     problem_file = write_temp_pddl_file(problem)
@@ -23,5 +24,11 @@ if __name__ == "__main__":
     print("Num errors:", problem_error_info.num_errors)
     print("Num warnings:", problem_error_info.num_warnings)
     print("Errors: ", problem_error_info.errors)
-    print("\n\n# Generated plan\n\n")
-    print(generate_plan(domain_file, problem_file))
+
+    print("\n\n# Planner Output\n\n")
+    planner_output = generate_plan(domain_file, problem_file)
+    if type(planner_output) is FDErrorInfo:
+        print("Exit code:", planner_output.exit_code)
+        print("Error message:", planner_output.error_message)
+    else:
+        print(planner_output)
