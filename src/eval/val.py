@@ -1,6 +1,5 @@
 from subprocess import PIPE, run
 import re
-from typing import Tuple
 
 
 class VALErrorInfo:

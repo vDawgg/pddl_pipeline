@@ -6,14 +6,6 @@ from src.pipeline.pipeline_base import PipelineBase
 from src.utils.io import write_temp_pddl_file
 
 
-# TODO: Instead of setting up VAL, we could also try to use the unified planning system
-#       This seems to have the same effect and have the upside of letting us define problems
-#       and domains in python and get direct feedback in python when parsing the problem or
-#       generating plans.
-#       → We should try the same modules we currently have with this approach and check
-#       whether we get enough information.
-
-
 # TODO: This function will need to persist results so nothing gets lost
 #       → Does not need to be the full PDDL results
 def run_eval(iterations: int, pipeline: PipelineBase) -> tuple[int, int, int, int]:

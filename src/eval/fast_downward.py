@@ -3,9 +3,13 @@ The parsing code is partially based on the fastdownward parsers from the downwar
 https://github.com/aibasel/lab/tree/main/downward/parsers
 """
 
+import re
+from dataclasses import dataclass
 from enum import StrEnum, auto
+from pathlib import Path
 
 from subprocess import PIPE, run
+from tempfile import NamedTemporaryFile
 
 
 class ExitCodes(StrEnum):
@@ -59,38 +63,61 @@ exit_codes = {
 }
 
 
+@dataclass
+class Action:
+    def __init__(self, action_name: str, parameters: list[str]):
+        self.action_name = action_name
+        self.parameters = parameters
+
+    def map_to_function_calls(self):
+        # TODO: Implement mapping to actual function definitions here
+        pass
+
+
+@dataclass
+class Plan:
+    def __init__(self, action_sequence: list[Action]):
+        self.action_sequence = action_sequence
+
+
+def parse_plan(plan_file: str) -> Plan:
+    latest_plan = ""
+    for i in range(1, 100):
+        candidate_path = Path(f"{plan_file}.{i}")
+        if candidate_path.is_file():
+            latest_plan = candidate_path
+        break
+
+    pattern = re.compile(r"\s*\(\s*(\S+)\s+(.*)\s*\)\s*")
+
+    action_sequence = []
+    with open(latest_plan, "r") as f:
+        for line in f:
+            match = pattern.match(line)
+            if match:
+                action_sequence.append(
+                    Action(
+                        action_name=match.group(1),
+                        parameters=match.group(2).split(),
+                    )
+                )
+
+    return Plan(action_sequence)
+
+
 class FDErrorInfo:
     def __init__(self, exit_code: ExitCodes, error_message: str):
         self.exit_code = exit_code
         self.error_message = error_message
 
 
-# NOTE: It is probably sufficient to just have a list instead of this here
-#       if there is nothing else that would be interesting about this
-class Plan:
-    def __init__(self, actionsequence):
-        pass
-
-
-# TODO: In addition to the error parsing here, we should also include parsing for the planning statistics.
-#       i.e. how long did the planning take, how many steps etc. if this is a sensible comparison
-def parse_planner_output(output: str, returncode: int) -> str | FDErrorInfo:
-    fd_code = exit_codes[returncode]
+def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
     if (
-        fd_code == ExitCodes.SUCCESS
-        or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY
-        or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_TIME
-        or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY_AND_TIME
-    ):
-        # TODO: This will need to be properly parsed once we have plans
-        return output
-    elif (
         fd_code == ExitCodes.TRANSLATE_CRITICAL_ERROR
         or fd_code == ExitCodes.TRANSLATE_INPUT_ERROR
     ):
         for line in output.strip().split("\n"):
             # TODO: If these are actually relevant after VAL could parse the files, the syntax hints should be included
-            # TODO: Figure out whether we want to account for metrics as well
             if (
                 line.startswith("Expected a")
                 or line.startswith("Reason:")
@@ -118,15 +145,14 @@ def parse_planner_output(output: str, returncode: int) -> str | FDErrorInfo:
         )
 
 
-# TODO: The str output here currently assumes that we have generated a plan
-#       → Once the pipeline is capable of producing valid PDDL, there should be an object representing this
-#       This function is different from the VAL related functions, as we are also interested in the output
-#       if no issues have been found
-def generate_plan(domain_file: str, problem_file: str) -> str | FDErrorInfo:
+def generate_plan(domain_file: str, problem_file: str) -> Plan | FDErrorInfo:
+    plan_file = NamedTemporaryFile(delete=False)
     process = run(
         [
             "python",
             "../fast-downward-24.06.1/fast-downward.py",
+            "--plan-file",
+            plan_file.name,
             "--alias",
             "seq-sat-lama-2011",
             domain_file,
@@ -136,4 +162,15 @@ def generate_plan(domain_file: str, problem_file: str) -> str | FDErrorInfo:
         stdout=PIPE,
         text=True,
     )
-    return parse_planner_output(process.stdout, process.returncode)
+    fd_code = exit_codes[process.returncode]
+    # TODO: In addition to the error parsing here, we should also include parsing for the planning statistics.
+    #       i.e. how long did the planning take, how many steps etc. if this is a sensible comparison
+    if (
+        fd_code == ExitCodes.SUCCESS
+        or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY
+        or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_TIME
+        or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY_AND_TIME
+    ):
+        return parse_plan(plan_file.name)
+    else:
+        return parse_error(fd_code, process.stdout)
