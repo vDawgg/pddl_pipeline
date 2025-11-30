@@ -77,7 +77,6 @@ def make_request(
         )
         res = response.choices[0].message.parsed
         assert res
-        messages.append(make_assistant_message(res.model_dump_json()))
         return res, messages
     else:
         response = client.chat.completions.create(
@@ -86,5 +85,4 @@ def make_request(
         )
         res = response.choices[0].message.content
         assert res
-        messages.append(make_assistant_message(res))
         return res, messages

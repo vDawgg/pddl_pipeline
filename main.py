@@ -1,34 +1,30 @@
-from src.eval.fast_downward import generate_plan, FDErrorInfo
-from src.eval.val import get_syntax_mistakes_problem, get_syntax_mistakes_domain
+import logging
+from argparse import ArgumentParser
+
 from src.inference import Models
-from src.pipeline.baseline import Baseline
-from src.utils.io import write_temp_pddl_file
+from src.pipeline import Pipelines, pipelines
+from src.utils.logger import configure_logging
 
 
 if __name__ == "__main__":
-    domain, problem = Baseline(Models.QWEN_3_VL_8B).run()
-    print("# Domain\n\n")
-    print(domain)
-    domain_file = write_temp_pddl_file(domain)
-    print("\n\n# Syntax checks domain\n\n")
-    domain_error_info = get_syntax_mistakes_domain(domain_file)
-    print("Num errors:", domain_error_info.num_errors)
-    print("Num warnings:", domain_error_info.num_warnings)
-    print("Errors: ", domain_error_info.errors)
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--pipeline",
+        choices=[Pipelines.BASELINE, Pipelines.VAL_FEEDBACK],
+        default=Pipelines.BASELINE,
+        required=False,
+    )
+    parser.add_argument(
+        "--model",
+        choices=[Models.QWEN_3_VL_8B],
+        default=Models.QWEN_3_VL_8B,
+        required=False,
+    )
+    args = parser.parse_args()
+    pipeline = args.pipeline
+    model = args.model
 
-    print("\n\n# Problem\n\n")
-    print(problem)
-    problem_file = write_temp_pddl_file(problem)
-    print("\n\n# Syntax check problem\n\n")
-    problem_error_info = get_syntax_mistakes_problem(domain_file, problem_file)
-    print("Num errors:", problem_error_info.num_errors)
-    print("Num warnings:", problem_error_info.num_warnings)
-    print("Errors: ", problem_error_info.errors)
+    configure_logging(logging.DEBUG)
+    logger = logging.getLogger(__name__)
 
-    print("\n\n# Planner Output\n\n")
-    planner_output = generate_plan(domain_file, problem_file)
-    if type(planner_output) is FDErrorInfo:
-        print("Exit code:", planner_output.exit_code)
-        print("Error message:", planner_output.error_message)
-    else:
-        print(planner_output)
+    pipelines[pipeline](model).run()
