@@ -10,7 +10,11 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument(
         "--pipeline",
-        choices=[Pipelines.BASELINE, Pipelines.VAL_FEEDBACK],
+        choices=[
+            Pipelines.BASELINE,
+            Pipelines.VAL_FEEDBACK,
+            Pipelines.VAL_AND_PLANNER_FEEDBACK,
+        ],
         default=Pipelines.BASELINE,
         required=False,
     )

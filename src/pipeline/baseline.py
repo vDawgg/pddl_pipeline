@@ -12,6 +12,26 @@ logger = logging.getLogger(__name__)
 
 
 class Baseline(PipelineBase):
+    def is_domain_valid(self, domain_file: str, domain: str) -> bool:
+        err_info = get_syntax_mistakes_domain(domain_file)
+        if err_info.num_errors > 0:
+            logger.debug("Failed to create a syntactically valid domain")
+            return False
+        logger.debug("# Domain\n\n")
+        logger.debug(domain)
+        return True
+
+    def is_problem_valid(
+        self, domain_file: str, problem_file: str, problem: str
+    ) -> bool:
+        err_info = get_syntax_mistakes_problem(domain_file, problem_file)
+        if err_info.num_errors > 0:
+            logger.debug("Failed to create a syntactically valid problem")
+            return False
+        logger.debug("# Problem\n\n")
+        logger.debug(problem)
+        return True
+
     def run(self) -> PipelineError | Plan:
         # TODO: We should add natural language descriptions of the actions we pass to the model
         # TODO: We should probably also test with the thinking variant of the model
@@ -20,12 +40,8 @@ class Baseline(PipelineBase):
             self.model,
         )
         domain_file = write_temp_pddl_file(domain)
-        err_info = get_syntax_mistakes_domain(domain_file)
-        if err_info.num_errors > 0:
-            logger.debug("Failed to create a syntactically valid domain")
+        if not self.is_domain_valid(domain_file, domain):
             return PipelineError.DOMAIN_FAILURE
-        logger.debug("# Domain\n\n")
-        logger.debug(domain)
 
         problem, messages = make_request(
             get_prompt(Prompts.BASELINE_PROBLEM),
@@ -33,12 +49,8 @@ class Baseline(PipelineBase):
             messages=[*messages, make_assistant_message(domain)],
         )
         problem_file = write_temp_pddl_file(problem)
-        err_info = get_syntax_mistakes_problem(domain_file, problem_file)
-        if err_info.num_errors > 0:
-            logger.debug("Failed to create a syntactically valid problem")
+        if not self.is_problem_valid(domain_file, problem_file, problem):
             return PipelineError.PROBLEM_FAILURE
-        logger.debug("# Problem\n\n")
-        logger.debug(problem)
 
         planner_output = generate_plan(domain_file, problem_file)
         if isinstance(planner_output, FDErrorInfo):

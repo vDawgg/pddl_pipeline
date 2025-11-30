@@ -11,7 +11,11 @@ if __name__ == "__main__":
     parser.add_argument("--iterations", default=1, type=int, required=False)
     parser.add_argument(
         "--pipeline",
-        choices=[Pipelines.BASELINE, Pipelines.VAL_FEEDBACK],
+        choices=[
+            Pipelines.BASELINE,
+            Pipelines.VAL_FEEDBACK,
+            Pipelines.VAL_AND_PLANNER_FEEDBACK,
+        ],
         default=Pipelines.BASELINE,
         required=False,
     )
