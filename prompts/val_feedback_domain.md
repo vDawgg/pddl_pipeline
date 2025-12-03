@@ -1,5 +1,15 @@
-There are syntax errors in the generated domain file.
+# Task Description
 
-Please fix the errors according to the following error messages and return the improved domain file.
+There are syntax errors in the following domain file.
 
-Errors:
+Fix the errors according to the error information outlined below.
+The error information is true and complete.
+Do not return the same file without implementing the fixes.
+
+# Domain
+
+{domain}
+
+# Errors:
+
+{errors}

@@ -15,7 +15,7 @@ class TestVAL:
         )
         assert error_info.num_errors == 3
         assert len(error_info.errors) == 3
-        assert len(set(error_info.errors)) == len(error_info.errors)
+        assert error_info.errors[0].pddl_line == ":parameters (?x - block)"
 
     def test_problem_no_err(self):
         error_info = get_syntax_mistakes_problem(
@@ -31,3 +31,4 @@ class TestVAL:
         )
         assert error_info.num_errors == 1
         assert len(error_info.errors) == 1
+        assert error_info.errors[0].pddl_line == "(:start"

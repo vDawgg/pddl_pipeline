@@ -1,10 +1,13 @@
 import os
+import logging
 from typing import Any, Type, TypeVar
 
 import openai
 from pydantic import BaseModel
 
 from src.inference import Models
+
+logger = logging.getLogger(__name__)
 
 
 def make_assistant_message(message: str) -> dict:
@@ -59,6 +62,9 @@ def make_request(
 ) -> tuple[T | str, list[Any]]:
     messages = messages or []
 
+    logger.debug("# User Message")
+    logger.debug(input_prompt)
+
     client = openai.OpenAI(
         base_url=os.environ.get("SERVER_ADDRESS", "http://localhost:8080/v1"),
         api_key="sk-no-key-required",
@@ -84,5 +90,7 @@ def make_request(
             messages=messages,
         )
         res = response.choices[0].message.content
+        logger.debug("# Assistant Message")
+        logger.debug(res)
         assert res
         return res, messages

@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class ValFeedbackPipeline(Baseline):
-    # NOTE: We probably dont even need the messages as context here. Instead, we could instruc the model to be an expert at fixing
-    #       PDDL files
-    def fix_domain(self, domain: str, messages: list[str], num_tries: int = 5) -> str:
+    def fix_domain(self, domain: str, num_tries: int = 5) -> str:
         for i in range(num_tries):
             logger.debug(f"Iterations domain syntax fixes: {i}")
             domain_file = write_temp_pddl_file(domain)
@@ -23,15 +21,20 @@ class ValFeedbackPipeline(Baseline):
             if err_info.num_errors == 0:
                 break
             else:
+                prompt = get_prompt(
+                    Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_DOMAIN
+                ).format(
+                    domain=domain,
+                    errors=err_info.get_lines_with_errors(),
+                )
                 domain, _ = make_request(
-                    get_prompt(Prompts.VAL_FEEDBACK_DOMAIN) + str(err_info.errors),
+                    prompt,
                     model_name=self.model,
-                    messages=[*messages, make_assistant_message(domain)],
                 )
         return domain
 
     def fix_problem(
-        self, domain_file: str, problem: str, messages: list[str], num_tries: int = 5
+        self, domain_file: str, domain: str, problem: str, num_tries: int = 5
     ) -> str:
         for i in range(num_tries):
             logger.debug(f"Iterations problem syntax fixes: {i}")
@@ -40,10 +43,16 @@ class ValFeedbackPipeline(Baseline):
             if err_info.num_errors == 0:
                 break
             else:
-                problem, messages = make_request(
-                    get_prompt(Prompts.VAL_FEEDBACK_DOMAIN) + str(err_info.errors),
+                prompt = get_prompt(
+                    Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_DOMAIN
+                ).format(
+                    domain=domain,
+                    problem=problem,
+                    errors=err_info.get_lines_with_errors(),
+                )
+                domain, _ = make_request(
+                    prompt,
                     model_name=self.model,
-                    messages=[*messages, make_assistant_message(problem)],
                 )
         return problem
 
@@ -52,7 +61,7 @@ class ValFeedbackPipeline(Baseline):
             get_prompt(Prompts.BASELINE_CONTEXT, Prompts.BASELINE_DOMAIN),
             model_name=self.model,
         )
-        domain = self.fix_domain(domain, messages)
+        domain = self.fix_domain(domain)
         domain_file = write_temp_pddl_file(domain)
         if not self.is_domain_valid(domain_file, domain):
             return PipelineError.DOMAIN_FAILURE
@@ -62,7 +71,7 @@ class ValFeedbackPipeline(Baseline):
             model_name=self.model,
             messages=[*messages, make_assistant_message(domain)],
         )
-        problem = self.fix_problem(domain_file, problem, messages)
+        problem = self.fix_problem(domain_file, domain, problem)
         problem_file = write_temp_pddl_file(problem)
         if not self.is_problem_valid(domain_file, problem_file, domain):
             return PipelineError.DOMAIN_FAILURE

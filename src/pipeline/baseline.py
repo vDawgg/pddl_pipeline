@@ -17,8 +17,7 @@ class Baseline(PipelineBase):
         if err_info.num_errors > 0:
             logger.debug("Failed to create a syntactically valid domain")
             return False
-        logger.debug("# Domain\n\n")
-        logger.debug(domain)
+        logger.debug("Generated syntactically valid domain")
         return True
 
     def is_problem_valid(
@@ -28,8 +27,7 @@ class Baseline(PipelineBase):
         if err_info.num_errors > 0:
             logger.debug("Failed to create a syntactically valid problem")
             return False
-        logger.debug("# Problem\n\n")
-        logger.debug(problem)
+        logger.debug("Generated syntactically valid problem")
         return True
 
     def run(self) -> PipelineError | Plan:

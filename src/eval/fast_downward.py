@@ -65,9 +65,8 @@ exit_codes = {
 
 @dataclass
 class Action:
-    def __init__(self, action_name: str, parameters: list[str]):
-        self.action_name = action_name
-        self.parameters = parameters
+    action_name: str
+    parameters: list[str]
 
     def map_to_function_calls(self):
         # TODO: Implement mapping to actual function definitions here
@@ -76,8 +75,7 @@ class Action:
 
 @dataclass
 class Plan:
-    def __init__(self, action_sequence: list[Action]):
-        self.action_sequence = action_sequence
+    action_sequence: list[Action]
 
 
 def parse_plan(plan_file: str) -> Plan:
@@ -86,7 +84,8 @@ def parse_plan(plan_file: str) -> Plan:
         candidate_path = Path(f"{plan_file}.{i}")
         if candidate_path.is_file():
             latest_plan = candidate_path
-        break
+        else:
+            break
 
     pattern = re.compile(r"\s*\(\s*(\S+)\s+(.*)\s*\)\s*")
 

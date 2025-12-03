@@ -1,15 +1,30 @@
+from dataclasses import dataclass
 from subprocess import PIPE, run
 import re
 
 
+@dataclass
+class ValError:
+    error_message: str
+    pddl_line: str
+
+    def get_line_with_error(self) -> str:
+        return (
+            f"Line: ```{self.pddl_line}```\nError Message: ```{self.error_message}```\n"
+        )
+
+
+@dataclass
 class VALErrorInfo:
-    def __init__(self, num_errors: int, num_warnings: int, errors: list[str]):
-        self.num_errors = num_errors
-        self.num_warnings = num_warnings
-        self.errors = errors
+    num_errors: int
+    num_warnings: int
+    errors: list[ValError]
+
+    def get_lines_with_errors(self) -> str:
+        return "\n".join([e.get_line_with_error() for e in self.errors])
 
 
-def make_error_info(parser_output: str):
+def make_error_info(parser_output: str, lines: list[str]):
     num_errors = 0
     num_warnings = 0
     errors = []
@@ -23,12 +38,17 @@ def make_error_info(parser_output: str):
         elif ": Error:" in line or ": Warning:" in line:
             match = re.search(r"line:\s*(\d+):\s*(Error|Warning):\s*(.+)", line)
             if match:
-                # TODO: The line error information could also be enriched with the actual
-                #       line it refers to, if the model still needs more context
-                line_num = match.group(1)
+                line_num = int(match.group(1)) - 1
                 error_type = match.group(2)
+                if error_type == "Warning":
+                    continue
                 message = match.group(3)
-                errors.append(f"line: {line_num}: {error_type}: {message}")
+                errors.append(
+                    ValError(
+                        error_message=message.strip(),
+                        pddl_line=lines[line_num].strip(),
+                    )
+                )
     return VALErrorInfo(num_errors, num_warnings, errors)
 
 
@@ -38,7 +58,9 @@ def get_syntax_mistakes_domain(domain_file: str) -> VALErrorInfo:
         stdout=PIPE,
         text=True,
     )
-    return make_error_info(process.stdout)
+    with open(domain_file, "r") as f:
+        error_info = make_error_info(process.stdout, f.readlines())
+    return error_info
 
 
 def get_syntax_mistakes_problem(domain_file: str, problem_file: str) -> VALErrorInfo:
@@ -47,7 +69,6 @@ def get_syntax_mistakes_problem(domain_file: str, problem_file: str) -> VALError
         stdout=PIPE,
         text=True,
     )
-    # TODO: Double check that using the same parsing approach here does not loose needed information
-    # NOTE: Unclear how the error information here should be related to the domain
-    #       However, this might not really matter, if we assume that we can only continue with a syntactically correct domain
-    return make_error_info(process.stdout)
+    with open(problem_file, "r") as f:
+        error_info = make_error_info(process.stdout, f.readlines())
+    return error_info
