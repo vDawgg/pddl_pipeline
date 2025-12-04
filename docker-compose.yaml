@@ -1,9 +1,29 @@
+x-llama-cpp-base: &llama-cpp-base
+  image: ghcr.io/ggml-org/llama.cpp:server-cuda
+  ports:
+    - 8080:8080
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: ["gpu"]
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:8080/v1/models || exit 1"]
+    interval: 120s
+    timeout: 120s
+    retries: 4
+    start_period: 120s
+
+x-llama-cpp-common-env: &common-env
+  LLAMA_ARG_CTX_SIZE: 8192
+  LLAMA_ARG_N_GPU_LAYERS: 99
+  LLAMA_ARG_PORT: 8080
+
 services:
-  llama-cpp:
-    # TODO: This version should ideally be fixed
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
-    ports:
-      - 8080:8080
+  qwen_25_coder:
+    <<: *llama-cpp-base
     command:
       - "--jinja"
       - "--top-k"
@@ -19,57 +39,32 @@ services:
       - "--presence-penalty"
       - "1.5"
     environment:
-      - LLAMA_ARG_HF_REPO=unsloth/Qwen3-VL-8B-Instruct-GGUF
-      - LLAMA_ARG_HF_FILE=Qwen3-VL-8B-Instruct-Q4_K_M.gguf
-      - LLAMA_ARG_CTX_SIZE=8192
-      - LLAMA_ARG_N_GPU_LAYERS=99
-      - LLAMA_ARG_PORT=8080
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: ["gpu"]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/v1/models || exit 1"]
-      interval: 120s
-      timeout: 120s
-      retries: 4
-      start_period: 120s
+      <<: *common-env
+      LLAMA_ARG_HF_REPO: unsloth/Qwen2.5-Coder-14B-Instruct-128K-GGUF
+      LLAMA_ARG_HF_FILE: Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf
 
-  vllm:
-    image: vllm/vllm-openai:latest
-    ports:
-      - 8080:8080
+  qwen_3_vl:
+    <<: *llama-cpp-base
     command:
-      - "--model"
-      - "Qwen/Qwen3-VL-8B-Instruct"
-      - "--port"
-      - "8080"
-      - "--quantization"
-      - "bitsandbytes"
-      - "--max_model_len"
-      - "12800"
-      - ""
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: ["gpu"]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/v1/models || exit 1"]
-      interval: 120s
-      timeout: 120s
-      retries: 4
-      start_period: 120s
+      - "--jinja"
+      - "--top-k"
+      - "20"
+      - "--top-p"
+      - "0.8"
+      - "--temp"
+      - "0.7"
+      - "--flash-attn"
+      - "on"
+    environment:
+      <<: *common-env
+      LLAMA_ARG_HF_REPO: unsloth/Qwen3-VL-8B-Instruct-GGUF
+      LLAMA_ARG_HF_FILE: Qwen3-VL-8B-Instruct-Q4_K_M.gguf
 
   pipeline:
     build: .
     depends_on:
-      llama-cpp:
+      qwen_3_vl:
+
         condition: service_healthy
     environment:
       SERVER_ADDRESS: "http://inference:8080/v1"
