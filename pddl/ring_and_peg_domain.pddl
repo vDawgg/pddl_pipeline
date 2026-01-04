@@ -1,5 +1,5 @@
 (define (domain RING_AND_PEG)
-    (:requirements :strips :typing :negative-preconditions)
+    (:requirements :strips :typing :negative-preconditions :conditional-effects)
     (:types ring peg)
     (:predicates 
         (at ?x - peg)
@@ -9,14 +9,15 @@
         (holding ?x - ring)
     )
 
+    ; NOTE: The actions below can be defined with more params than the original methods written in python.
+    ;       The model should later be instructed to build up the actions with the minimum of the actions
+    ;       defined for the original python functions with the caveat that additional params will not be
+    ;       passed to the function in production.
     (:action move
-        ; NOTE: We need to model this in some way in the sim as well.
-        ;       -> We could just ommit the from param when parsing as we do not need it for our
-        ;          current move implementation.
-        :parameters (?from - peg ?to - peg)
-        :precondition (and (at ?from) (not (at ?to)))
+        :parameters (?to - peg)
+        :precondition (and (not (at ?to)))
         :effect (and 
-            (not (at ?from))
+            (forall (?p - peg) (not (at ?p)))
             (at ?to)
         )
     )
