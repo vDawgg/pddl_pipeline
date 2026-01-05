@@ -2,7 +2,7 @@ import logging
 
 from tqdm import tqdm
 
-from src.pipeline.pipeline_base import PipelineBase, PipelineError
+from src.base.pipeline import PipelineBase, PipelineError
 
 
 logger = logging.getLogger(__name__)

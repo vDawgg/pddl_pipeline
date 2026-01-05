@@ -8,4 +8,4 @@ Additionally make sure your output is complete and can be used by a solver to ge
 
 All PDDL files have to adhere to the PDDL 2.1 standard.
 
-Answer only with PDDL as output.
+Answer **only** with PDDL as output. The result will directly be piped into a PDDL planner and should therefor be syntactically and semantically sound.

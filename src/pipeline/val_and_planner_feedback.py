@@ -1,8 +1,9 @@
 import logging
 
 from src.inference.model_comm import make_assistant_message, make_request
-from src.eval.fast_downward import Plan, generate_plan, FDErrorInfo
-from src.pipeline.pipeline_base import PipelineError
+from src.eval.fast_downward import Plan, generate_plan, FDErrorInfo, ExitCodes
+from src.base.pipeline import PipelineError
+from src.base.schema import PDDLFiles
 from src.pipeline.val_feedback import ValFeedbackPipeline
 from src.utils.io import write_temp_pddl_file
 from src.utils.prompts import Prompts, get_prompt
@@ -11,10 +12,55 @@ from src.utils.prompts import Prompts, get_prompt
 logger = logging.getLogger(__name__)
 
 
+# NOTE: The models do not properly incorporate feedback.
+#       -> Larger models might fix this but will mean that we will not be able to run the pipeline on Jetson.
+#       -> Another approach could be to introduce the checks as tools instead of using them for the feedback loops.
 class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
-    # NOTE: This does not account for syntax mistakes the model might make after the basis was syntactically correct
-    # TODO: We should probably add the planners output due to the above
-    #       -> Also try and see whether we can get some form of reasoning unsolvable plans
+    def fix_plan_not_found(self, domain: str, problem: str) -> tuple[str, str]:
+        unformatted_prompt = get_prompt(
+            Prompts.PLANNER_CONTEXT, Prompts.PLANNER_TASK
+        )
+        prompt = unformatted_prompt.format(
+            file=PDDLFiles.DOMAIN, domain=domain, problem=problem
+        )
+        domain, _ = make_request(
+            prompt,
+            model_name=self.model,
+        )
+        prompt = unformatted_prompt.format(
+            file=PDDLFiles.PROBLEM, domain=domain, problem=problem
+        )
+        problem, _ = make_request(
+            prompt,
+            model_name=self.model,
+        )
+        domain_file = write_temp_pddl_file(domain)
+        problem_file = write_temp_pddl_file(problem)
+        return domain_file, problem_file
+
+    def fix_parsing_error(self, domain: str, problem: str, planner_output: FDErrorInfo) -> tuple[str, str]:
+        unformatted_prompt = get_prompt(
+            Prompts.PLANNER_TRANSLATE_CONTEXT, Prompts.PLANNER_TRANSLATE_TASK
+        )
+        if planner_output.file == PDDLFiles.DOMAIN:
+            content = domain
+        else:
+            content = problem
+        prompt = unformatted_prompt.format(
+            file=planner_output.file, err_msg=planner_output.error_message, content=content
+        )
+        output, _ = make_request(
+            prompt,
+            model_name=self.model,
+        )
+        if planner_output.file == PDDLFiles.DOMAIN:
+            domain = output
+        else:
+            problem = output
+        domain_file = write_temp_pddl_file(domain)
+        problem_file = write_temp_pddl_file(problem)
+        return domain_file, problem_file
+
     def fix_planning(
         self,
         domain_file: str,
@@ -30,25 +76,15 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
             planner_output = generate_plan(domain_file, problem_file)
             if isinstance(planner_output, Plan):
                 break
-            unformatted_prompt = get_prompt(
-                Prompts.PLANNER_CONTEXT, Prompts.PLANNER_TASK
-            )
-            prompt = unformatted_prompt.format(
-                file="domain", domain=domain, problem=problem
-            )
-            domain, _ = make_request(
-                prompt,
-                model_name=self.model,
-            )
-            prompt = unformatted_prompt.format(
-                file="problem", domain=domain, problem=problem
-            )
-            problem, _ = make_request(
-                prompt,
-                model_name=self.model,
-            )
-            domain_file = write_temp_pddl_file(domain)
-            problem_file = write_temp_pddl_file(problem)
+            elif planner_output.exit_code in [ExitCodes.TRANSLATE_CRITICAL_ERROR, ExitCodes.TRANSLATE_INPUT_ERROR]:
+                logger.debug("Parsing error")
+                print(planner_output.exit_code)
+                print(planner_output.error_message)
+                assert planner_output.file is not None
+                domain_file, problem_file = self.fix_parsing_error(domain, problem, planner_output)
+            else:
+                logger.debug("Planning error")
+                domain_file, problem_file = self.fix_plan_not_found(domain, problem, planner_output)
         assert planner_output is not None
         return planner_output
 
@@ -57,7 +93,7 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
             get_prompt(Prompts.BASELINE_CONTEXT, Prompts.BASELINE_DOMAIN),
             model_name=self.model,
         )
-        domain = self.fix_domain(domain, messages)
+        domain = self.fix_domain(domain)
         domain_file = write_temp_pddl_file(domain)
         if not self.is_domain_valid(domain_file, domain):
             return PipelineError.DOMAIN_FAILURE
@@ -67,7 +103,7 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
             model_name=self.model,
             messages=[*messages, make_assistant_message(domain)],
         )
-        problem = self.fix_problem(domain_file, problem, messages)
+        problem = self.fix_problem(domain_file, domain, problem)
         problem_file = write_temp_pddl_file(problem)
         if not self.is_problem_valid(domain_file, problem_file, problem):
             logger.debug("Problem failure")

@@ -12,6 +12,8 @@ class Prompts(StrEnum):
     VAL_FEEDBACK_PROBLEM = "val_feedback_problem.md"
     PLANNER_CONTEXT = "planner_context.md"
     PLANNER_TASK = "planner_task.md"
+    PLANNER_TRANSLATE_CONTEXT = "planner_translate_context.md"
+    PLANNER_TRANSLATE_TASK = "planner_translate_task.md"
 
 
 def get_prompt(*prompts: Prompts) -> str:

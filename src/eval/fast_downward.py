@@ -3,13 +3,15 @@ The parsing code is partially based on the fastdownward parsers from the downwar
 https://github.com/aibasel/lab/tree/main/downward/parsers
 """
 
+from pathlib import Path
 import re
-from dataclasses import dataclass
 from enum import StrEnum, auto
 from pathlib import Path
 
 from subprocess import PIPE, run
 from tempfile import NamedTemporaryFile
+
+from src.base.schema import PDDLFiles, Action, Plan
 
 
 class ExitCodes(StrEnum):
@@ -63,21 +65,6 @@ exit_codes = {
 }
 
 
-@dataclass
-class Action:
-    action_name: str
-    parameters: list[str]
-
-    def map_to_function_calls(self):
-        # TODO: Implement mapping to actual function definitions here
-        pass
-
-
-@dataclass
-class Plan:
-    action_sequence: list[Action]
-
-
 def parse_plan(plan_file: str) -> Plan:
     latest_plan = ""
     for i in range(1, 100):
@@ -105,9 +92,10 @@ def parse_plan(plan_file: str) -> Plan:
 
 
 class FDErrorInfo:
-    def __init__(self, exit_code: ExitCodes, error_message: str):
+    def __init__(self, exit_code: ExitCodes, error_message: str, file: PDDLFiles | None = None):
         self.exit_code = exit_code
         self.error_message = error_message
+        self.file = file
 
 
 def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
@@ -115,16 +103,23 @@ def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
         fd_code == ExitCodes.TRANSLATE_CRITICAL_ERROR
         or fd_code == ExitCodes.TRANSLATE_INPUT_ERROR
     ):
-        for line in output.strip().split("\n"):
-            # TODO: If these are actually relevant after VAL could parse the files, the syntax hints should be included
+        current_file = None
+        lines = output.strip().split("\n")
+        for i, line in enumerate(lines):
+            if line.startswith("Parsing domain") or line.startswith("Error: Could not parse domain file"):
+                current_file = PDDLFiles.DOMAIN
+            elif line.startswith("Parsing problem"):
+                current_file = PDDLFiles.PROBLEM
             if (
                 line.startswith("Expected a")
                 or line.startswith("Reason:")
                 or line.startswith("Expecting")
             ):
+                assert i+1 < len(lines)
                 return FDErrorInfo(
                     fd_code,
-                    f"Error in PDDL translation. Output from fast downward planner:\n{line}",
+                    f"Error in PDDL translation. Output from fast downward planner:\n{line}\n{lines[i+1]}",
+                    current_file
                 )
         return FDErrorInfo(fd_code, "Error in PDDL translation")
     elif (

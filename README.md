@@ -8,7 +8,7 @@ While the dependencies noted below are part of the docker image, the following o
 
 For the syntax checks courtesy of [VAL](https://github.com/KCL-Planning/VAL) make sure to install the ```Parser``` binary to your system together with the corresponding ```libval.so``` library.
 
-Additionally, for the FastDownward planning system build version ```24.06.1```, which you can find [here](https://www.fast-downward.org) and place its source directoy one level outside of this, so it can be referenced in our code by ```../../fast-downward-24.06.1/fast-downward.py```.
+Additionally, for the FastDownward planning system build version ```24.06.1```, which you can find [here](https://www.fast-downward.org), place its source directoy one level outside of this directory and build the release by running ```build.py release```, so it can be referenced in our code by ```../../fast-downward-24.06.1/fast-downward.py```.
 
 ## Running the project
 

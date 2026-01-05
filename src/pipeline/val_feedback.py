@@ -3,7 +3,7 @@ import logging
 from src.eval.val import get_syntax_mistakes_domain, get_syntax_mistakes_problem
 from src.eval.fast_downward import generate_plan, FDErrorInfo, Plan
 from src.inference.model_comm import make_request, make_assistant_message
-from src.pipeline.pipeline_base import PipelineError
+from src.base.pipeline import PipelineError
 from src.pipeline.baseline import Baseline
 from src.utils.io import write_temp_pddl_file
 from src.utils.prompts import Prompts, get_prompt

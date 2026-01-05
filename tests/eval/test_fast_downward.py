@@ -43,9 +43,10 @@ class TestFastDownward:
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
+        print(error_info.error_message)
         assert (
             error_info.error_message
-            == "Error in PDDL translation. Output from fast downward planner:\nExpected a non-empty block starting with any of the following words: :requirements, :types, :constants, :predicates, :functions, :derived, :action"
+            == "Error in PDDL translation. Output from fast downward planner:\nExpected a non-empty block starting with any of the following words: :requirements, :types, :constants, :predicates, :functions, :derived, :action\nGot: [':actions', ['pick-up', ':parameters', ['?x', '-', 'block'], ':precondition', ['and', ['on-table', '?x'], ['clear', '?x'], ['free-arm']], ':effect', ['and', ['not', ['on-table', '?x']], ['holding', '?x'], ['not', ['clear', '?x']], ['not', ['free-arm']], ['gripped', '?x']]], ['put-down', ':parameters', ['?x', '-', 'block'], ':precondition', ['and', ['holding', '?x'], ['clear', '?y'], ['not', ['attached', '?x']]], ':effect', ['and', ['not', ['holding', '?x']], ['on-table', '?x'], ['clear', '?y'], ['not', ['gripped', '?x']], ['free-arm']]], ['stack', ':parameters', ['?x', '-', 'block', '?y', '-', 'block'], ':precondition', ['and', ['holding', '?x'], ['on', '?y', '?z'], ['clear', '?y'], ['not', ['attached', '?x']]], ':effect', ['and', ['not', ['holding', '?x']], ['on', '?x', '?y'], ['clear', '?z'], ['not', ['gripped', '?x']], ['free-arm'], ['attached', '?x']]], ['unstack', ':parameters', ['?x', '-', 'block', '?y', '-', 'block'], ':precondition', ['and', ['on', '?x', '?y'], ['clear', '?x'], ['not', ['attached', '?x']]], ':effect', ['and', ['not', ['on', '?x', '?y']], ['on-table', '?x'], ['clear', '?y'], ['not', ['attached', '?x']], ['gripped', '?x'], ['free-arm']]]]"
         )
 
     def test_search_unsolved(self):
