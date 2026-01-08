@@ -12,14 +12,23 @@ repos:
         always_run: true
       - id: ruff-lint
         name: ruff-lint
-        entry: uv format --check
+        entry: uv run ruff check
+        args: [
+          --force-exclude,
+          --config,
+          pyproject.toml,
+          --fix,
+          --show-fixes,
+          --exit-non-zero-on-fix,
+        ]
         language: system
         types_or: [python]
         require_serial: true # run once for all files
         pass_filenames: false
       - id: ruff-format
         name: ruff-format
-        entry: uv format
+        entry: uv run ruff format
+        args: [--force-exclude, --config, pyproject.toml]
         language: system
         types_or: [python]
         require_serial: true # run once for all files

@@ -6,7 +6,6 @@ https://github.com/aibasel/lab/tree/main/downward/parsers
 from pathlib import Path
 import re
 from enum import StrEnum, auto
-from pathlib import Path
 
 from subprocess import PIPE, run
 from tempfile import NamedTemporaryFile
