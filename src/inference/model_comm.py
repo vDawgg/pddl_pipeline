@@ -5,7 +5,8 @@ from typing import Any, Type, TypeVar
 import openai
 from pydantic import BaseModel
 
-from src.inference import Models
+from src.inference import Models, provider_keys, provider_hosts
+from src.constants import project_root
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +67,8 @@ def make_request(
     logger.debug(input_prompt)
 
     client = openai.OpenAI(
-        base_url=os.environ.get("SERVER_ADDRESS", "http://localhost:8080/v1"),
-        api_key="sk-no-key-required",
+        base_url=provider_hosts[model_name],
+        api_key=open(str(project_root / provider_keys[model_name])).readline().strip(),
     )
 
     if imgs:

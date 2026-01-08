@@ -92,7 +92,9 @@ def parse_plan(plan_file: str) -> Plan:
 
 
 class FDErrorInfo:
-    def __init__(self, exit_code: ExitCodes, error_message: str, file: PDDLFiles | None = None):
+    def __init__(
+        self, exit_code: ExitCodes, error_message: str, file: PDDLFiles | None = None
+    ):
         self.exit_code = exit_code
         self.error_message = error_message
         self.file = file
@@ -106,7 +108,9 @@ def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
         current_file = None
         lines = output.strip().split("\n")
         for i, line in enumerate(lines):
-            if line.startswith("Parsing domain") or line.startswith("Error: Could not parse domain file"):
+            if line.startswith("Parsing domain") or line.startswith(
+                "Error: Could not parse domain file"
+            ):
                 current_file = PDDLFiles.DOMAIN
             elif line.startswith("Parsing problem"):
                 current_file = PDDLFiles.PROBLEM
@@ -115,11 +119,11 @@ def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
                 or line.startswith("Reason:")
                 or line.startswith("Expecting")
             ):
-                assert i+1 < len(lines)
+                assert i + 1 < len(lines)
                 return FDErrorInfo(
                     fd_code,
-                    f"Error in PDDL translation. Output from fast downward planner:\n{line}\n{lines[i+1]}",
-                    current_file
+                    f"Error in PDDL translation. Output from fast downward planner:\n{line}\n{lines[i + 1]}",
+                    current_file,
                 )
         return FDErrorInfo(fd_code, "Error in PDDL translation")
     elif (

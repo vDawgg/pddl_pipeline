@@ -17,9 +17,7 @@ logger = logging.getLogger(__name__)
 #       -> Another approach could be to introduce the checks as tools instead of using them for the feedback loops.
 class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
     def fix_plan_not_found(self, domain: str, problem: str) -> tuple[str, str]:
-        unformatted_prompt = get_prompt(
-            Prompts.PLANNER_CONTEXT, Prompts.PLANNER_TASK
-        )
+        unformatted_prompt = get_prompt(Prompts.PLANNER_CONTEXT, Prompts.PLANNER_TASK)
         prompt = unformatted_prompt.format(
             file=PDDLFiles.DOMAIN, domain=domain, problem=problem
         )
@@ -38,7 +36,9 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
         problem_file = write_temp_pddl_file(problem)
         return domain_file, problem_file
 
-    def fix_parsing_error(self, domain: str, problem: str, planner_output: FDErrorInfo) -> tuple[str, str]:
+    def fix_parsing_error(
+        self, domain: str, problem: str, planner_output: FDErrorInfo
+    ) -> tuple[str, str]:
         unformatted_prompt = get_prompt(
             Prompts.PLANNER_TRANSLATE_CONTEXT, Prompts.PLANNER_TRANSLATE_TASK
         )
@@ -47,7 +47,9 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
         else:
             content = problem
         prompt = unformatted_prompt.format(
-            file=planner_output.file, err_msg=planner_output.error_message, content=content
+            file=planner_output.file,
+            err_msg=planner_output.error_message,
+            content=content,
         )
         output, _ = make_request(
             prompt,
@@ -76,15 +78,20 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
             planner_output = generate_plan(domain_file, problem_file)
             if isinstance(planner_output, Plan):
                 break
-            elif planner_output.exit_code in [ExitCodes.TRANSLATE_CRITICAL_ERROR, ExitCodes.TRANSLATE_INPUT_ERROR]:
+            elif planner_output.exit_code in [
+                ExitCodes.TRANSLATE_CRITICAL_ERROR,
+                ExitCodes.TRANSLATE_INPUT_ERROR,
+            ]:
                 logger.debug("Parsing error")
                 print(planner_output.exit_code)
                 print(planner_output.error_message)
                 assert planner_output.file is not None
-                domain_file, problem_file = self.fix_parsing_error(domain, problem, planner_output)
+                domain_file, problem_file = self.fix_parsing_error(
+                    domain, problem, planner_output
+                )
             else:
                 logger.debug("Planning error")
-                domain_file, problem_file = self.fix_plan_not_found(domain, problem, planner_output)
+                domain_file, problem_file = self.fix_plan_not_found(domain, problem)
         assert planner_output is not None
         return planner_output
 

@@ -20,7 +20,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--model",
-        choices=[Models.QWEN_3_VL_8B],
+        choices=[model.value for model in Models],
         default=Models.QWEN_3_VL_8B,
         required=False,
     )

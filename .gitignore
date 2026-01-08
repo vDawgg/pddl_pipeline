@@ -218,3 +218,5 @@ __marimo__/
 notes/
 VAL/
 ! VAL/.gitkeep
+
+.openai-key
