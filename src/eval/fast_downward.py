@@ -3,14 +3,20 @@ The parsing code is partially based on the fastdownward parsers from the downwar
 https://github.com/aibasel/lab/tree/main/downward/parsers
 """
 
+import datetime
+import shutil
+import time
 from pathlib import Path
-import re
 from enum import StrEnum, auto
 
 from subprocess import PIPE, run
 from tempfile import NamedTemporaryFile
 
-from src.base.schema import PDDLFiles, Action, Plan
+from src.base.pipeline import Pipelines
+from src.base.schema import PDDLFiles
+from src.constants import plans_dir
+from src.inference import Models
+from src.utils.domains import Domains
 
 
 class ExitCodes(StrEnum):
@@ -64,7 +70,7 @@ exit_codes = {
 }
 
 
-def parse_plan(plan_file: str) -> Plan:
+def save_plan(plan_file: str, model: Models, pipeline: Pipelines, domain: Domains):
     latest_plan = ""
     for i in range(1, 100):
         candidate_path = Path(f"{plan_file}.{i}")
@@ -72,22 +78,12 @@ def parse_plan(plan_file: str) -> Plan:
             latest_plan = candidate_path
         else:
             break
-
-    pattern = re.compile(r"\s*\(\s*(\S+)\s+(.*)\s*\)\s*")
-
-    action_sequence = []
-    with open(latest_plan, "r") as f:
-        for line in f:
-            match = pattern.match(line)
-            if match:
-                action_sequence.append(
-                    Action(
-                        action_name=match.group(1),
-                        parameters=match.group(2).split(),
-                    )
-                )
-
-    return Plan(action_sequence)
+    curr_timestamp = datetime.datetime.fromtimestamp(time.time()).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    shutil.copyfile(
+        latest_plan, plans_dir / f"{domain}_{pipeline}_{model}_{curr_timestamp}.plan"
+    )
 
 
 class FDErrorInfo:
@@ -142,12 +138,20 @@ def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
         )
 
 
-def generate_plan(domain_file: str, problem_file: str) -> Plan | FDErrorInfo:
+def generate_plan(
+    domain_file: str,
+    problem_file: str,
+    model: Models,
+    pipeline: Pipelines,
+    domain: Domains,
+) -> FDErrorInfo | None:
     plan_file = NamedTemporaryFile(delete=False)
     process = run(
         [
             "python",
             "../fast-downward-24.06.1/fast-downward.py",
+            "--overall-time-limit",
+            "1m",
             "--plan-file",
             plan_file.name,
             "--alias",
@@ -168,6 +172,6 @@ def generate_plan(domain_file: str, problem_file: str) -> Plan | FDErrorInfo:
         or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_TIME
         or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY_AND_TIME
     ):
-        return parse_plan(plan_file.name)
+        return save_plan(plan_file.name, model, pipeline, domain)
     else:
         return parse_error(fd_code, process.stdout)

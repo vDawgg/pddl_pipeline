@@ -4,17 +4,14 @@ from argparse import ArgumentParser
 from src.inference import Models
 from src.pipeline import Pipelines, pipelines
 from src.utils.logger import configure_logging
+from src.utils.domains import Domains
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument(
         "--pipeline",
-        choices=[
-            Pipelines.BASELINE,
-            Pipelines.VAL_FEEDBACK,
-            Pipelines.VAL_AND_PLANNER_FEEDBACK,
-        ],
+        choices=[pipeline.value for pipeline in Pipelines],
         default=Pipelines.BASELINE,
         required=False,
     )
@@ -24,11 +21,18 @@ if __name__ == "__main__":
         default=Models.QWEN_3_VL_8B,
         required=False,
     )
+    parser.add_argument(
+        "--domain",
+        choices=[domain.value for domain in Domains],
+        default=Domains.BLOCKSWORLD,
+        required=False,
+    )
     args = parser.parse_args()
     pipeline = args.pipeline
     model = args.model
+    domain = args.domain
 
     configure_logging(logging.DEBUG)
     logger = logging.getLogger(__name__)
 
-    pipelines[pipeline](model).run()
+    pipelines[pipeline](model, domain).run()

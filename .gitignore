@@ -220,3 +220,5 @@ VAL/
 ! VAL/.gitkeep
 
 .openai-key
+plans/*
+!plans/.gitkeep

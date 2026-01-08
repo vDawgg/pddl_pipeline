@@ -1,12 +1,15 @@
 from enum import StrEnum
 
 from src.constants import prompts_dir
+from src.utils.domains import Domains
 
 
 class Prompts(StrEnum):
-    BASELINE_CONTEXT = "baseline_context.md"
-    BASELINE_DOMAIN = "baseline_domain.md"
-    BASELINE_PROBLEM = "baseline_problem.md"
+    GENERATION_CONTEXT = "generation_context.md"
+    BLOCKSWORLD_DOMAIN = "blocksworld_domain.md"
+    BLOCKSWORLD_PROBLEM = "blocksworld_problem.md"
+    RING_AND_PEG_DOMAIN = "ring_and_peg_domain.md"
+    RING_AND_PEG_PROBLEM = "ring_and_peg_problem.md"
     VAL_FEEDBACK_CONTEXT = "val_feedback_context.md"
     VAL_FEEDBACK_DOMAIN = "val_feedback_domain.md"
     VAL_FEEDBACK_PROBLEM = "val_feedback_problem.md"
@@ -23,3 +26,18 @@ def get_prompt(*prompts: Prompts) -> str:
             parts.append(f.read())
 
     return "\n\n".join(parts)
+
+
+domain_pompts = {
+    Domains.BLOCKSWORLD: get_prompt(
+        Prompts.GENERATION_CONTEXT, Prompts.BLOCKSWORLD_DOMAIN
+    ),
+    Domains.RING_AND_PEG: get_prompt(
+        Prompts.GENERATION_CONTEXT, Prompts.RING_AND_PEG_DOMAIN
+    ),
+}
+
+problem_prompts = {
+    Domains.BLOCKSWORLD: get_prompt(Prompts.BLOCKSWORLD_PROBLEM),
+    Domains.RING_AND_PEG: get_prompt(Prompts.RING_AND_PEG_PROBLEM),
+}

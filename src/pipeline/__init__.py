@@ -1,14 +1,7 @@
-from enum import StrEnum, auto
-
+from src.base.pipeline import Pipelines
 from src.pipeline.baseline import Baseline
 from src.pipeline.val_feedback import ValFeedbackPipeline
 from src.pipeline.val_and_planner_feedback import ValAndPlannerFeedbackPipeline
-
-
-class Pipelines(StrEnum):
-    BASELINE = auto()
-    VAL_FEEDBACK = auto()
-    VAL_AND_PLANNER_FEEDBACK = auto()
 
 
 pipelines = {

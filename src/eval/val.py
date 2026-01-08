@@ -9,9 +9,7 @@ class ValError:
     pddl_line: str
 
     def get_line_with_error(self) -> str:
-        return (
-            f"Line: ```{self.pddl_line}```\nError Message: ```{self.error_message}```\n"
-        )
+        return f"Line: {self.pddl_line}\nError Message: {self.error_message}\n"
 
 
 @dataclass
