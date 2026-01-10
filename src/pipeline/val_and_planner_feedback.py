@@ -2,8 +2,8 @@ import logging
 
 from src.inference.model_comm import make_assistant_message, make_request
 from src.eval.fast_downward import generate_plan, FDErrorInfo, ExitCodes
-from src.base.pipeline import PipelineError, Pipelines
-from src.base.schema import PDDLFiles
+from src.base.pipeline import Pipelines
+from src.base.schema import PDDLFiles, PipelineResult, PipelineError
 from src.pipeline.val_feedback import ValFeedbackPipeline
 from src.utils.io import write_temp_pddl_file
 from src.utils.prompts import Prompts, get_prompt, domain_pompts, problem_prompts
@@ -74,9 +74,10 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
         domain: str,
         problem: str,
         num_tries: int = 5,
-    ) -> FDErrorInfo | None:
+    ) -> tuple[FDErrorInfo | None, int]:
         assert num_tries > 0
         planner_output = None
+        iterations = 0
         for i in range(num_tries):
             logger.debug(f"Iterations planning fixes: {i}")
             planner_output = generate_plan(
@@ -89,41 +90,57 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
                 ExitCodes.TRANSLATE_INPUT_ERROR,
             ]:
                 logger.debug("Parsing error")
-                print(planner_output.exit_code)
-                print(planner_output.error_message)
                 assert planner_output.file is not None
+                iterations = i
                 domain_file, problem_file = self.fix_parsing_error(
                     domain, problem, planner_output
                 )
             else:
                 logger.debug("Planning error")
+                iterations = i
                 domain_file, problem_file = self.fix_plan_not_found(domain, problem)
-        return planner_output
+        return planner_output, iterations
 
-    def run(self) -> PipelineError | None:
+    def run(self) -> PipelineResult:
+        iterations: dict[str, int] = {}
+
         domain, messages = make_request(
             domain_pompts[self.domain],
             model_name=self.model,
         )
-        domain = self.fix_domain(domain)
+        domain, domain_iters = self.fix_domain(domain)
+        iterations["domain_fixes"] = domain_iters
+
         domain_file = write_temp_pddl_file(domain)
         if not self.is_domain_valid(domain_file):
-            return PipelineError.DOMAIN_FAILURE
+            return PipelineResult(
+                error=PipelineError.DOMAIN_FAILURE, iterations=iterations
+            )
 
         problem, messages = make_request(
             problem_prompts[self.domain],
             model_name=self.model,
             messages=[*messages, make_assistant_message(domain)],
         )
-        problem = self.fix_problem(domain_file, domain, problem)
+        problem, problem_iters = self.fix_problem(domain_file, domain, problem)
+        iterations["problem_fixes"] = problem_iters
+
         problem_file = write_temp_pddl_file(problem)
         if not self.is_problem_valid(domain_file, problem_file):
             logger.debug("Problem failure")
-            return PipelineError.PROBLEM_FAILURE
+            return PipelineResult(
+                error=PipelineError.PROBLEM_FAILURE, iterations=iterations
+            )
 
-        planner_output = self.fix_planning(domain_file, problem_file, domain, problem)
+        planner_output, planner_iters = self.fix_planning(
+            domain_file, problem_file, domain, problem
+        )
+        iterations["planner_fixes"] = planner_iters
+
         if isinstance(planner_output, FDErrorInfo):
             logger.debug("Failed to generate a plan")
-            return PipelineError.PLAN_FAILURE
+            return PipelineResult(
+                error=PipelineError.PLAN_FAILURE, iterations=iterations
+            )
         logger.debug("# Successfully generated a plan")
-        return planner_output
+        return PipelineResult(iterations=iterations)

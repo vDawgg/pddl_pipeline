@@ -2,6 +2,10 @@ x-llama-cpp-base: &llama-cpp-base
   image: ghcr.io/ggml-org/llama.cpp:server-cuda
   ports:
     - 8080:8080
+  networks:
+    default:
+      aliases:
+        - inference
   deploy:
     resources:
       reservations:
@@ -16,14 +20,24 @@ x-llama-cpp-base: &llama-cpp-base
     retries: 4
     start_period: 120s
 
-x-llama-cpp-common-env: &common-env
+x-llama-cpp-common-env: &llama-cpp-common-env
   LLAMA_ARG_CTX_SIZE: 8192
   LLAMA_ARG_N_GPU_LAYERS: 99
   LLAMA_ARG_PORT: 8080
 
+x-pipeline-common-env: &pipeline-common-env
+  SERVER_ADDRESS: "http://inference:8080/v1"
+  EVAL_ITERATIONS: ${EVAL_ITERATIONS}
+  EVAL_PIPELINE: ${EVAL_PIPELINE}
+  EVAL_DOMAIN: ${EVAL_DOMAIN}
+
+x-pipeline-base: &pipeline-base
+  build: .
+
 services:
   qwen_25_coder:
     <<: *llama-cpp-base
+    profiles: ["qwen_25_coder"]
     command:
       - "--jinja"
       - "--top-k"
@@ -39,12 +53,13 @@ services:
       - "--presence-penalty"
       - "1.5"
     environment:
-      <<: *common-env
+      <<: *llama-cpp-common-env
       LLAMA_ARG_HF_REPO: unsloth/Qwen2.5-Coder-14B-Instruct-128K-GGUF
       LLAMA_ARG_HF_FILE: Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf
 
   qwen_3_vl:
     <<: *llama-cpp-base
+    profiles: ["qwen_3_vl"]
     command:
       - "--jinja"
       - "--top-k"
@@ -56,15 +71,58 @@ services:
       - "--flash-attn"
       - "on"
     environment:
-      <<: *common-env
+      <<: *llama-cpp-common-env
       LLAMA_ARG_HF_REPO: unsloth/Qwen3-VL-8B-Instruct-GGUF
       LLAMA_ARG_HF_FILE: Qwen3-VL-8B-Instruct-Q4_K_M.gguf
 
-  pipeline:
-    build: .
-    depends_on:
-      qwen_3_vl:
+  gemma3:
+    <<: *llama-cpp-base
+    profiles: ["gemma3"]
+    command:
+      - "--jinja"
+      - "--temp"
+      - "1.0"
+      - "--repeat-penalty"
+      - "1.0"
+      - "--min-p"
+      - "0.01"
+      - "--top-k"
+      - "64"
+      - "--top-p"
+      - "0.95"
+      - "--flash-attn"
+      - "on"
+    environment:
+      <<: *llama-cpp-common-env
+      LLAMA_ARG_HF_REPO: unsloth/gemma-3-12b-it-GGUF
+      LLAMA_ARG_HF_FILE: gemma-3-12b-it-Q5_K_M.gguf
 
+  pipeline_qwen_25_coder:
+    <<: *pipeline-base
+    profiles: ["qwen_25_coder"]
+    depends_on:
+      qwen_25_coder:
         condition: service_healthy
     environment:
-      SERVER_ADDRESS: "http://inference:8080/v1"
+      <<: *pipeline-common-env
+      EVAL_MODEL: "qwen-2.5-coder"
+
+  pipeline_qwen_3_vl:
+    <<: *pipeline-base
+    profiles: ["qwen_3_vl"]
+    depends_on:
+      qwen_3_vl:
+        condition: service_healthy
+    environment:
+      <<: *pipeline-common-env
+      EVAL_MODEL: "qwen-3-vl"
+
+  pipeline_gemma3:
+    <<: *pipeline-base
+    profiles: ["gemma3"]
+    depends_on:
+      gemma3:
+        condition: service_healthy
+    environment:
+      <<: *pipeline-common-env
+      EVAL_MODEL: "gemma3"

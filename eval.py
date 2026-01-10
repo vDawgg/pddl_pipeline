@@ -1,4 +1,5 @@
 import logging
+import os
 from argparse import ArgumentParser
 
 from src.inference import Models
@@ -9,24 +10,31 @@ from src.utils.domains import Domains
 
 # TODO: For ease of use this should probably just be merged with main.py
 if __name__ == "__main__":
+    env_iterations = os.environ.get("EVAL_ITERATIONS", 1)
+    env_pipeline = os.environ.get("EVAL_PIPELINE", Pipelines.BASELINE.value)
+    env_model = os.environ.get("EVAL_MODEL", Models.QWEN_3_VL_8B.value)
+    env_domain = os.environ.get("EVAL_DOMAIN", Domains.BLOCKSWORLD.value)
+
     parser = ArgumentParser()
-    parser.add_argument("--iterations", default=1, type=int, required=False)
+    parser.add_argument(
+        "--iterations", default=env_iterations, type=int, required=False
+    )
     parser.add_argument(
         "--pipeline",
         choices=[pipeline.value for pipeline in Pipelines],
-        default=Pipelines.BASELINE,
+        default=env_pipeline,
         required=False,
     )
     parser.add_argument(
         "--model",
         choices=[model.value for model in Models],
-        default=Models.QWEN_3_VL_8B,
+        default=env_model,
         required=False,
     )
     parser.add_argument(
         "--domain",
         choices=[domain.value for domain in Domains],
-        default=Domains.BLOCKSWORLD,
+        default=env_domain,
         required=False,
     )
     args = parser.parse_args()
@@ -38,12 +46,20 @@ if __name__ == "__main__":
     configure_logging(logging.INFO)
     logger = logging.getLogger(__name__)
 
-    model_failures, syntax_domain, syntax_problem, failed_plans = run_eval(
-        iterations, pipelines[pipeline](model, domain)
-    )
+    eval_results = run_eval(iterations, pipelines[pipeline](model, domain))
     logger.info("# Evaluation Results:")
     logger.info(f"Total number of iterations: {iterations}")
-    logger.info(f"Number of generation failures: {model_failures}")
-    logger.info(f"Number of syntactically incorrect domains: {syntax_domain}")
-    logger.info(f"Number of syntactically incorrect problems: {syntax_problem}")
-    logger.info(f"Number of unsolvable problems: {failed_plans}")
+    logger.info(f"Number of generation failures: {eval_results.num_model_errors}")
+    logger.info(
+        f"Number of syntactically incorrect domains: {eval_results.num_syntactically_incorrect_domains}"
+    )
+    logger.info(
+        f"Number of syntactically incorrect problems: {eval_results.num_syntactically_incorrect_problems}"
+    )
+    logger.info(f"Number of unsolvable problems: {eval_results.num_failed_plans}")
+    logger.info(
+        f"Total number of feedback loops: {eval_results.get_all_total_iterations()}"
+    )
+    logger.info(
+        f"Average number of feedback loops: {eval_results.get_all_avg_iterations()}"
+    )

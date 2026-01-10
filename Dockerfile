@@ -32,5 +32,11 @@ FROM app_base
 COPY ./src ./src
 COPY ./prompts ./prompts
 COPY ./main.py ./main.py
+COPY ./eval.py ./eval.py
+COPY ./.default-key ./.default-key
 
-CMD ["uv", "run", "main.py"]
+CMD uv run eval.py \
+    --iterations ${EVAL_ITERATIONS} \
+    --pipeline ${EVAL_PIPELINE} \
+    --model ${EVAL_MODEL} \
+    --domain ${EVAL_DOMAIN}

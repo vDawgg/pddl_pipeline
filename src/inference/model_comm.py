@@ -65,9 +65,13 @@ def make_request(
     logger.debug("# User Message")
     logger.debug(input_prompt)
 
+    key_path = project_root / provider_keys[model_name]
+    if not key_path.exists():
+        raise FileNotFoundError(f"API key file not found: {key_path}")
+
     client = openai.OpenAI(
         base_url=provider_hosts[model_name],
-        api_key=open(str(project_root / provider_keys[model_name])).readline().strip(),
+        api_key=open(str(key_path)).readline().strip(),
     )
 
     if imgs:

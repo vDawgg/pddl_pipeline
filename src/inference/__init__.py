@@ -6,6 +6,7 @@ from collections import defaultdict
 class Models(StrEnum):
     QWEN_3_VL_8B = "qwen-3-vl"
     QWEN_25_CODER_14B = "qwen-2.5-coder"
+    GEMMA_3_12B = "gemma3"
     GPT_52 = "gpt-5.2"
     GPT_5_NANO = "gpt-5-nano"
 

@@ -12,7 +12,7 @@ Additionally, for the FastDownward planning system build version ```24.06.1```, 
 
 ## Running the project
 
-Before running the pipelines proposed in this thesis, the inference server hosting the LLM has to be started. For this, we provide docker compose services, which are set up for the models evaluated in this project. All current implementations use quantized versions of the models for faster inference. To start one of the models, run ```docker compose up <model-name>```.
+Before running the pipelines proposed in this thesis, the inference server hosting the LLM has to be started. For this, we provide docker compose services, which are set up for the models evaluated in this project. All current implementations use quantized versions of the models for faster inference. To start one of the models, run ```docker compose up <model-name>```. For running a model and a pipeline, run ```docker compose --profile <model-name> up```, the config for the evaluation pipeline can be changed by setting the values inside .env.
 
 **Note:** We assume that the [nvidia container toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) is set up on your system, to make GPU inference work.
 

@@ -4,7 +4,7 @@ from src.eval.fast_downward import generate_plan, FDErrorInfo
 from src.eval.val import get_syntax_mistakes_domain, get_syntax_mistakes_problem
 from src.inference.model_comm import make_request, make_assistant_message
 from src.base.pipeline import PipelineBase, Pipelines
-from src.base.schema import PipelineError
+from src.base.schema import PipelineError, PipelineResult
 from src.utils.io import write_temp_pddl_file
 from src.utils.prompts import domain_pompts, problem_prompts
 
@@ -37,7 +37,7 @@ class Baseline(PipelineBase):
         logger.debug("Generated syntactically valid problem")
         return True
 
-    def run(self) -> PipelineError | None:
+    def run(self) -> PipelineResult:
         # TODO: We should probably also test with the thinking variant of the model
         domain, messages = make_request(
             domain_pompts[self.domain],
@@ -45,7 +45,7 @@ class Baseline(PipelineBase):
         )
         domain_file = write_temp_pddl_file(domain)
         if not self.is_domain_valid(domain_file):
-            return PipelineError.DOMAIN_FAILURE
+            return PipelineResult(error=PipelineError.DOMAIN_FAILURE)
 
         problem, messages = make_request(
             problem_prompts[self.domain],
@@ -54,15 +54,15 @@ class Baseline(PipelineBase):
         )
         problem_file = write_temp_pddl_file(problem)
         if not self.is_problem_valid(domain_file, problem_file):
-            return PipelineError.PROBLEM_FAILURE
+            return PipelineResult(error=PipelineError.PROBLEM_FAILURE)
 
         planner_output = generate_plan(
             domain_file, problem_file, self.model, self.pipeline, self.domain
         )
         if isinstance(planner_output, FDErrorInfo):
             logger.debug("Failed to generate a plan")
-            return PipelineError.PLAN_FAILURE
+            return PipelineResult(error=PipelineError.PLAN_FAILURE)
         logger.debug("# Plan\n\n")
         logger.debug(planner_output)
 
-        return planner_output
+        return PipelineResult()

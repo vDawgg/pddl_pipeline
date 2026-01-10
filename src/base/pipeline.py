@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from enum import StrEnum, auto
 
 from src.inference import Models
-from src.base.schema import PipelineError
+from src.base.schema import PipelineResult
 from src.utils.domains import Domains
 
 
@@ -19,5 +19,5 @@ class PipelineBase(ABC):
         self.domain = domain
 
     @abstractmethod
-    def run(self) -> PipelineError | None:
+    def run(self) -> PipelineResult:
         pass
