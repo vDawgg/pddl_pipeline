@@ -3,5 +3,7 @@ from pathlib import Path
 
 project_root = (Path(__file__) / ".." / "..").resolve()
 src_dir = project_root / "src"
-prompts_dir = src_dir / ".." / "prompts"
-plans_dir = src_dir / ".." / "plans"
+prompts_dir = project_root / "prompts"
+plans_dir = project_root / "plans"
+generated_pddl_dir = project_root / "pddl" / "generated"
+results_dir = project_root / "results"

@@ -37,7 +37,7 @@ x-pipeline-base: &pipeline-base
 services:
   qwen_25_coder:
     <<: *llama-cpp-base
-    profiles: ["qwen_25_coder"]
+    profiles: ["qwen-2.5-coder"]
     command:
       - "--jinja"
       - "--top-k"
@@ -99,7 +99,7 @@ services:
 
   pipeline_qwen_25_coder:
     <<: *pipeline-base
-    profiles: ["qwen_25_coder"]
+    profiles: ["qwen-2.5-coder"]
     depends_on:
       qwen_25_coder:
         condition: service_healthy

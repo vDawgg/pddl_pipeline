@@ -3,20 +3,16 @@ The parsing code is partially based on the fastdownward parsers from the downwar
 https://github.com/aibasel/lab/tree/main/downward/parsers
 """
 
-import datetime
 import shutil
-import time
 from pathlib import Path
 from enum import StrEnum, auto
 
 from subprocess import PIPE, run
 from tempfile import NamedTemporaryFile
 
-from src.base.pipeline import Pipelines
 from src.base.schema import PDDLFiles
 from src.constants import plans_dir
-from src.inference import Models
-from src.utils.domains import Domains
+from src.utils.timestamp import get_current_timestamp
 
 
 class ExitCodes(StrEnum):
@@ -70,7 +66,7 @@ exit_codes = {
 }
 
 
-def save_plan(plan_file: str, model: Models, pipeline: Pipelines, domain: Domains):
+def save_plan(plan_file: Path, name: str) -> Path:
     latest_plan = ""
     for i in range(1, 100):
         candidate_path = Path(f"{plan_file}.{i}")
@@ -78,12 +74,9 @@ def save_plan(plan_file: str, model: Models, pipeline: Pipelines, domain: Domain
             latest_plan = candidate_path
         else:
             break
-    curr_timestamp = datetime.datetime.fromtimestamp(time.time()).strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-    shutil.copyfile(
-        latest_plan, plans_dir / f"{domain}_{pipeline}_{model}_{curr_timestamp}.plan"
-    )
+    plan_name = plans_dir / f"{name}_{get_current_timestamp()}.plan"
+    shutil.copyfile(latest_plan, plan_name)
+    return plan_name
 
 
 class FDErrorInfo:
@@ -139,12 +132,10 @@ def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
 
 
 def generate_plan(
-    domain_file: str,
-    problem_file: str,
-    model: Models,
-    pipeline: Pipelines,
-    domain: Domains,
-) -> FDErrorInfo | None:
+    domain_file: Path,
+    problem_file: Path,
+    name: str,
+) -> FDErrorInfo | Path:
     plan_file = NamedTemporaryFile(delete=False)
     process = run(
         [
@@ -172,6 +163,6 @@ def generate_plan(
         or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_TIME
         or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY_AND_TIME
     ):
-        return save_plan(plan_file.name, model, pipeline, domain)
+        return save_plan(Path(plan_file.name), name)
     else:
         return parse_error(fd_code, process.stdout)

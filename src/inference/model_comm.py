@@ -97,4 +97,6 @@ def make_request(
         logger.debug("# Assistant Message")
         logger.debug(res)
         assert res
-        return res, messages
+        res = res.removeprefix("```pddl")
+        res = res.removesuffix("```")
+        return res.strip(), messages

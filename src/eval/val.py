@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 from subprocess import PIPE, run
 import re
 
@@ -50,7 +51,7 @@ def make_error_info(parser_output: str, lines: list[str]):
     return VALErrorInfo(num_errors, num_warnings, errors)
 
 
-def get_syntax_mistakes_domain(domain_file: str) -> VALErrorInfo:
+def get_syntax_mistakes_domain(domain_file: Path) -> VALErrorInfo:
     process = run(
         ["Parser", domain_file],
         stdout=PIPE,
@@ -61,7 +62,7 @@ def get_syntax_mistakes_domain(domain_file: str) -> VALErrorInfo:
     return error_info
 
 
-def get_syntax_mistakes_problem(domain_file: str, problem_file: str) -> VALErrorInfo:
+def get_syntax_mistakes_problem(domain_file: Path, problem_file: Path) -> VALErrorInfo:
     process = run(
         ["Parser", domain_file, problem_file],
         stdout=PIPE,

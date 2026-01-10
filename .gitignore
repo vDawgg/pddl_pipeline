@@ -215,9 +215,10 @@ __marimo__/
 .streamlit/secrets.toml
 
 notes/
-VAL/
-! VAL/.gitkeep
-
 .openai-key
 plans/*
 !plans/.gitkeep
+pddl/generated/*
+!pddl/generated/.gitkeep
+results/*
+!results/.gitkeep

@@ -4,7 +4,6 @@ from argparse import ArgumentParser
 
 from src.inference import Models
 from src.pipeline import Pipelines, pipelines
-from src.eval.eval_harness import run_eval
 from src.utils.logger import configure_logging
 from src.utils.domains import Domains
 
@@ -46,20 +45,5 @@ if __name__ == "__main__":
     configure_logging(logging.INFO)
     logger = logging.getLogger(__name__)
 
-    eval_results = run_eval(iterations, pipelines[pipeline](model, domain))
-    logger.info("# Evaluation Results:")
-    logger.info(f"Total number of iterations: {iterations}")
-    logger.info(f"Number of generation failures: {eval_results.num_model_errors}")
-    logger.info(
-        f"Number of syntactically incorrect domains: {eval_results.num_syntactically_incorrect_domains}"
-    )
-    logger.info(
-        f"Number of syntactically incorrect problems: {eval_results.num_syntactically_incorrect_problems}"
-    )
-    logger.info(f"Number of unsolvable problems: {eval_results.num_failed_plans}")
-    logger.info(
-        f"Total number of feedback loops: {eval_results.get_all_total_iterations()}"
-    )
-    logger.info(
-        f"Average number of feedback loops: {eval_results.get_all_avg_iterations()}"
-    )
+    results_file = pipelines[pipeline](model, domain).run_eval(iterations)
+    logger.info(f"# Saved results to {results_file}")

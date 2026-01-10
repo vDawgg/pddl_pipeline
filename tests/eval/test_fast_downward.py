@@ -1,6 +1,3 @@
-from src.inference import Models
-from src.pipeline import Pipelines
-from src.utils.domains import Domains
 from src.eval.fast_downward import (
     generate_plan,
     ExitCodes,
@@ -13,11 +10,9 @@ class TestFastDownward:
     def test_translate_error_expected(self):
         pddl_dir = eval_resource_dir / "test_translate_error_expected"
         error_info = generate_plan(
-            str(pddl_dir / "domain.pddl"),
-            str(pddl_dir / "problem.pddl"),
-            Models.QWEN_3_VL_8B,
-            Pipelines.VAL_AND_PLANNER_FEEDBACK,
-            Domains.RING_AND_PEG,
+            pddl_dir / "domain.pddl",
+            pddl_dir / "problem.pddl",
+            "test",
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
@@ -29,11 +24,9 @@ class TestFastDownward:
     def test_search_unsolved(self):
         pddl_dir = eval_resource_dir / "test_search_unsolved"
         error_info = generate_plan(
-            str(pddl_dir / "domain.pddl"),
-            str(pddl_dir / "problem.pddl"),
-            Models.QWEN_3_VL_8B,
-            Pipelines.VAL_AND_PLANNER_FEEDBACK,
-            Domains.RING_AND_PEG,
+            pddl_dir / "domain.pddl",
+            pddl_dir / "problem.pddl",
+            "test",
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.SEARCH_UNSOLVED_INCOMPLETE
