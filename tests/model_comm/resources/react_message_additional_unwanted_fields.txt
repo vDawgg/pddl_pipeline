@@ -1,0 +1,22 @@
+Some things in the start
+
+
+[[ -- thought -- ]]
+Some thought
+
+[[ -- tool_name -- ]]
+some_tool
+
+Some things inbetween
+Some more things inbetween.
+
+[[ -- tool_args -- ]]
+{
+  "content": "something"
+}
+
+
+Something else
+
+[[ -- tool_result -- ]]
+result

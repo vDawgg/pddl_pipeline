@@ -24,5 +24,5 @@ def write_pddl_file(
 
 
 def read_pddl_file(pddl_file: Path) -> str:
-    with open(pddl_file, "r") as f:
+    with open(pddl_file) as f:
         return f.read()

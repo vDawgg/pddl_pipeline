@@ -1,18 +1,17 @@
 import logging
 from abc import ABC, abstractmethod
-from enum import StrEnum, Enum, auto
+from enum import Enum, StrEnum, auto
 from functools import wraps
 from pathlib import Path
 
 import polars as pl
 from tqdm import tqdm
 
+from src.base.schema import PipelineError, PipelineResult
 from src.constants import results_dir
 from src.inference import Models
-from src.base.schema import PipelineResult, PipelineError
 from src.utils.domains import Domains
 from src.utils.timestamp import get_current_timestamp
-
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +20,7 @@ class Pipelines(StrEnum):
     BASELINE = auto()
     VAL_FEEDBACK = auto()
     VAL_AND_PLANNER_FEEDBACK = auto()
+    TOOL_CALL = auto()
 
 
 def catch_model_failure(f):

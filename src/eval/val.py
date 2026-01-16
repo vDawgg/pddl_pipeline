@@ -1,7 +1,7 @@
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import PIPE, run
-import re
 
 
 @dataclass
@@ -57,7 +57,7 @@ def get_syntax_mistakes_domain(domain_file: Path) -> VALErrorInfo:
         stdout=PIPE,
         text=True,
     )
-    with open(domain_file, "r") as f:
+    with open(domain_file) as f:
         error_info = make_error_info(process.stdout, f.readlines())
     return error_info
 
@@ -68,6 +68,6 @@ def get_syntax_mistakes_problem(domain_file: Path, problem_file: Path) -> VALErr
         stdout=PIPE,
         text=True,
     )
-    with open(problem_file, "r") as f:
+    with open(problem_file) as f:
         error_info = make_error_info(process.stdout, f.readlines())
     return error_info

@@ -1,6 +1,6 @@
 import os
-from enum import StrEnum
 from collections import defaultdict
+from enum import StrEnum
 
 
 class Models(StrEnum):

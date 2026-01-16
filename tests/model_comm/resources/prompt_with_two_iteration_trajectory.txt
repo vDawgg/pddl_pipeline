@@ -1,0 +1,27 @@
+Some prompt for the model to follow
+
+
+[[ -- trajectory -- ]]
+[[ -- thought_0 -- ]]
+First thought
+
+[[ -- tool_name_0 -- ]]
+first_tool
+
+[[ -- tool_args_0 -- ]]
+{'first_arg': 1}
+
+[[ -- tool_result_0 -- ]]
+result_one
+
+[[ -- thought_1 -- ]]
+Second thought
+
+[[ -- tool_name_1 -- ]]
+second_tool
+
+[[ -- tool_args_1 -- ]]
+{'second_arg': 2}
+
+[[ -- tool_result_1 -- ]]
+result_two

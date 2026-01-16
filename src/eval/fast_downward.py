@@ -4,10 +4,9 @@ https://github.com/aibasel/lab/tree/main/downward/parsers
 """
 
 import shutil
-from pathlib import Path
 from enum import StrEnum, auto
-
-from subprocess import PIPE, run
+from pathlib import Path
+from subprocess import run
 from tempfile import NamedTemporaryFile
 
 from src.base.schema import PDDLFiles
@@ -150,8 +149,7 @@ def generate_plan(
             domain_file,
             problem_file,
         ],
-        stderr=PIPE,
-        stdout=PIPE,
+        capture_output=True,
         text=True,
     )
     fd_code = exit_codes[process.returncode]

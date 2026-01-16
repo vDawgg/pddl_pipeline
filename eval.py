@@ -4,8 +4,8 @@ from argparse import ArgumentParser
 
 from src.inference import Models
 from src.pipeline import Pipelines, pipelines
-from src.utils.logger import configure_logging
 from src.utils.domains import Domains
+from src.utils.logger import configure_logging
 
 # TODO: For ease of use this should probably just be merged with main.py
 if __name__ == "__main__":

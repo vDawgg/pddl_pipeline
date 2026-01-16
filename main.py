@@ -3,9 +3,8 @@ from argparse import ArgumentParser
 
 from src.inference import Models
 from src.pipeline import Pipelines, pipelines
-from src.utils.logger import configure_logging
 from src.utils.domains import Domains
-
+from src.utils.logger import configure_logging
 
 if __name__ == "__main__":
     parser = ArgumentParser()

@@ -1,7 +1,7 @@
 from src.eval.fast_downward import (
-    generate_plan,
     ExitCodes,
     FDErrorInfo,
+    generate_plan,
 )
 from tests.constants import eval_resource_dir
 

@@ -1,0 +1,10 @@
+[[ -- thought -- ]]
+Some thought
+
+[[ -- tool_name -- ]]
+some_tool
+
+[[ -- tool_args -- ]]
+{
+  "content": "something"
+}
