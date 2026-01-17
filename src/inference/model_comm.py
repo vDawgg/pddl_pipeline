@@ -289,8 +289,6 @@ def make_request[T](
         return res.strip(), messages
 
 
-# TODO: This might have to be dumbed down with the logic transferred to the pipeline
-#       Otherwise we might have problems with the structure here.
 # TODO: Try with native openai tool-calling as well
 #       -> This structure seems to be supported by most of the newer models.
 def make_react_workflow(
@@ -298,7 +296,7 @@ def make_react_workflow(
     input_prompt: str,
     tools: list[Callable],
     max_iters=10,
-) -> str:
+) -> tuple[str, int]:
     tools_json = [make_tool(t) for t in tools]
     tools_dict = {t.__name__: t for t in tools}
 
@@ -317,6 +315,7 @@ def make_react_workflow(
     res = None
     parsed_responses = []
     tool_results = []
+    num_model_calls = 0
     for _ in range(max_iters):
         prompt_with_trajectory = make_prompt_with_trajectory(
             input_prompt, parsed_responses, tool_results
@@ -332,6 +331,7 @@ def make_react_workflow(
             .choices[0]
             .message.content
         )
+        num_model_calls += 1
         assert res is not None
         logger.debug("# Assistant Message")
         logger.debug(res)
@@ -359,4 +359,4 @@ def make_react_workflow(
         logger.debug(f"## Tool args: {parsed_response.tool_args}")
         logger.debug(f"## Tool result: {tool_results[-1]}")
     assert res is not None
-    return res.strip()
+    return res.strip(), num_model_calls

@@ -4,7 +4,6 @@ from pathlib import Path
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
 from src.eval.fast_downward import FDErrorInfo, generate_plan
 from src.eval.val import get_syntax_mistakes_domain, get_syntax_mistakes_problem
-from src.inference.model_comm import make_react_workflow
 from src.pipeline.val_and_planner_feedback import ValAndPlannerFeedbackPipeline
 from src.utils.io import write_pddl_file
 from src.utils.prompts import Prompts, get_prompt
@@ -16,8 +15,6 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
     def __init__(self, model, domain, pipeline=None):
         super().__init__(model, domain, pipeline)
         self.name = "tool_call_pipeline"
-        self.domain_file: Path | None = None
-        self.problem_file: Path | None = None
         self.create_pddl_file_calls = 0
         self.read_pddl_file_calls = 0
         self.edit_lines_calls = 0
@@ -57,7 +54,6 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
             self.problem_file = file_path
         return file_path._str
 
-    # TODO: Test this function
     def read_pddl_file(
         self, file: str, line_range: tuple[int, int] | None = None
     ) -> str:
@@ -79,7 +75,6 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
                 return "".join(f.readlines()[start : end + 1])
             return f.read()
 
-    # TODO: Test this function
     def edit_lines(self, file: str, line_range: tuple[int, int], replacement: str):
         """
         Replace the lines of a file in a given range with the specified replacement string.
@@ -96,6 +91,8 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
             start, end = line_range
             lines = f.readlines()
             lines[start : end + 1] = [r + "\n" for r in replacement.split("\n")]
+            f.seek(0)
+            f.truncate()
             f.write("".join(lines))
 
     def get_syntax_mistakes_domain(self, domain_file: str) -> str:
@@ -142,8 +139,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
     # TODO: We should probably experiment with separating / changing the instructions for the creation and fixing loops
     # TODO: We can also try to steer the output with format requirements
     def _run_impl(self) -> PipelineResult:
-        make_react_workflow(
-            model_name=self.model,
+        self.make_react_workflow(
             input_prompt=get_prompt(Prompts.GENERATION_CONTEXT, Prompts.RING_AND_PEG),
             tools=[
                 self.create_pddl_file,
@@ -167,7 +163,6 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
             f"# Get syntax mistakes problem calls: {self.get_syntax_mistakes_problem_calls}"
         )
         error = None
-        plan = None
         if self.domain_file is None or not self.is_domain_valid(self.domain_file):
             error = PipelineError.DOMAIN_FAILURE
         elif self.problem_file is None or not self.is_problem_valid(
@@ -181,13 +176,10 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
                     f"# Failed to generate solvable domain and problem: {plan.error_message}"
                 )
                 error = PipelineError.PLAN_FAILURE
-                plan = None
-        return PipelineResult(
-            elapsed_time=self.elapsed_time,
+            else:
+                self.plan_file = plan
+        return self.create_result(
             error=error,
-            domain_file=self.domain_file,
-            problem_file=self.problem_file,
-            plan_file=plan,
             _number_of_fixes=sum(
                 c or 0
                 for c in [

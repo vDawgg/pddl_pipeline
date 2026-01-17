@@ -6,7 +6,7 @@ from src.base.schema import PDDLFiles, PipelineError, PipelineResult
 from src.eval.fast_downward import FDErrorInfo, generate_plan
 from src.eval.val import get_syntax_mistakes_domain, get_syntax_mistakes_problem
 from src.inference import Models
-from src.inference.model_comm import make_assistant_message, make_request
+from src.inference.model_comm import make_assistant_message
 from src.utils.domains import Domains
 from src.utils.io import write_pddl_file
 from src.utils.prompts import domain_pompts, problem_prompts
@@ -41,49 +41,29 @@ class Baseline(PipelineBase):
         return True
 
     def _run_impl(self) -> PipelineResult:
-        domain, messages = make_request(
+        domain, messages = self.make_request(
             domain_pompts[self.domain],
-            self.model,
         )
-        domain_file = write_pddl_file(
+        self.domain_file = write_pddl_file(
             domain, name=self.name, pddl_file_type=PDDLFiles.DOMAIN
         )
-        if not self.is_domain_valid(domain_file):
-            return PipelineResult(
-                elapsed_time=self.elapsed_time,
-                error=PipelineError.DOMAIN_FAILURE,
-                domain_file=domain_file,
-            )
+        if not self.is_domain_valid(self.domain_file):
+            return self.create_result(error=PipelineError.DOMAIN_FAILURE)
 
-        problem, messages = make_request(
+        problem, messages = self.make_request(
             problem_prompts[self.domain],
-            self.model,
             messages=[*messages, make_assistant_message(domain)],
         )
-        problem_file = write_pddl_file(
+        self.problem_file = write_pddl_file(
             problem, name=self.name, pddl_file_type=PDDLFiles.PROBLEM
         )
-        if not self.is_problem_valid(domain_file, problem_file):
-            return PipelineResult(
-                elapsed_time=self.elapsed_time,
-                error=PipelineError.PROBLEM_FAILURE,
-                domain_file=domain_file,
-                problem_file=problem_file,
-            )
+        if not self.is_problem_valid(self.domain_file, self.problem_file):
+            return self.create_result(error=PipelineError.PROBLEM_FAILURE)
 
-        planner_output = generate_plan(domain_file, problem_file, self.name)
+        planner_output = generate_plan(self.domain_file, self.problem_file, self.name)
         if isinstance(planner_output, FDErrorInfo):
             logger.debug("Failed to generate a plan")
-            return PipelineResult(
-                elapsed_time=self.elapsed_time,
-                error=PipelineError.PLAN_FAILURE,
-                domain_file=domain_file,
-                problem_file=problem_file,
-            )
+            return self.create_result(error=PipelineError.PLAN_FAILURE)
         logger.debug("# Successfully generated a plan")
-        return PipelineResult(
-            elapsed_time=self.elapsed_time,
-            domain_file=domain_file,
-            problem_file=problem_file,
-            plan_file=planner_output,
-        )
+        self.plan_file = planner_output
+        return self.create_result()

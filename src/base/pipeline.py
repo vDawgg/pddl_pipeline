@@ -1,19 +1,30 @@
 import logging
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from enum import Enum, StrEnum, auto
 from pathlib import Path
+from typing import Any, TypeVar
 
 import polars as pl
+from pydantic import BaseModel
 from tqdm import tqdm
 
 from src.base.schema import PipelineError, PipelineResult
 from src.constants import results_dir
 from src.inference import Models
+from src.inference.model_comm import (
+    make_react_workflow as _make_react_workflow,
+)
+from src.inference.model_comm import (
+    make_request as _make_request,
+)
 from src.utils.domains import Domains
 from src.utils.timestamp import get_current_timestamp
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class Pipelines(StrEnum):
@@ -34,16 +45,76 @@ class PipelineBase(ABC):
         self.pipeline = pipeline
         self.name = f"{self.domain}_{self.pipeline}_{self.model}"
         self.elapsed_time: float = 0.0
+        self.num_model_calls: int = 0
+        self.domain_file: Path | None = None
+        self.problem_file: Path | None = None
+        self.plan_file: Path | None = None
+
+    def create_result(
+        self,
+        error: PipelineError | None = None,
+        num_domain_fixes: int | None = None,
+        num_problem_fixes: int | None = None,
+        num_planner_fixes: int | None = None,
+        _number_of_fixes: int | None = None,
+    ) -> PipelineResult:
+        return PipelineResult(
+            elapsed_time=self.elapsed_time,
+            num_model_calls=self.num_model_calls,
+            error=error,
+            domain_file=self.domain_file,
+            problem_file=self.problem_file,
+            plan_file=self.plan_file,
+            num_domain_fixes=num_domain_fixes,
+            num_problem_fixes=num_problem_fixes,
+            num_planner_fixes=num_planner_fixes,
+            _number_of_fixes=_number_of_fixes,
+        )
 
     def run(self) -> PipelineResult:
+        self.num_model_calls = 0
+        self.domain_file = None
+        self.problem_file = None
+        self.plan_file = None
         start = time.perf_counter()
         try:
             result = self._run_impl()
         except Exception as e:
             self.elapsed_time = time.perf_counter() - start
             logger.debug(f"Caught exception while running inference: {e}")
-            return PipelineResult(self.elapsed_time, PipelineError.MODEL_FAILURE)
+            return self.create_result(error=PipelineError.MODEL_FAILURE)
         self.elapsed_time = time.perf_counter() - start
+        return result
+
+    def make_request(
+        self,
+        input_prompt: str,
+        messages: list[Any] | None = None,
+        format: type[T] | None = None,
+        imgs: list[str] | None = None,
+    ) -> tuple[T | str, list[Any]]:
+        self.num_model_calls += 1
+        return _make_request(
+            input_prompt,
+            model_name=self.model,
+            messages=messages,
+            format=format,
+            imgs=imgs,
+        )
+
+    def make_react_workflow(
+        self,
+        input_prompt: str,
+        tools: list[Callable],
+        max_iters: int = 10,
+    ) -> str:
+        result, num_calls = _make_react_workflow(
+            model_name=self.model,
+            input_prompt=input_prompt,
+            tools=tools,
+            max_iters=max_iters,
+        )
+        self.num_model_calls += num_calls
         return result
 
     @abstractmethod
