@@ -1,7 +1,7 @@
 import logging
+import time
 from abc import ABC, abstractmethod
 from enum import Enum, StrEnum, auto
-from functools import wraps
 from pathlib import Path
 
 import polars as pl
@@ -21,18 +21,7 @@ class Pipelines(StrEnum):
     VAL_FEEDBACK = auto()
     VAL_AND_PLANNER_FEEDBACK = auto()
     TOOL_CALL = auto()
-
-
-def catch_model_failure(f):
-    @wraps(f)
-    def wrapper(self, *args, **kwargs):
-        try:
-            return f(self, *args, **kwargs)
-        except Exception as e:
-            logger.debug(f"Caught exception while running inference: {e}")
-            return PipelineResult(PipelineError.MODEL_FAILURE)
-
-    return wrapper
+    TOOL_CALL_MULTI_AGENT = auto()
 
 
 class PipelineBase(ABC):
@@ -44,10 +33,21 @@ class PipelineBase(ABC):
         self.domain = domain
         self.pipeline = pipeline
         self.name = f"{self.domain}_{self.pipeline}_{self.model}"
+        self.elapsed_time: float = 0.0
+
+    def run(self) -> PipelineResult:
+        start = time.perf_counter()
+        try:
+            result = self._run_impl()
+        except Exception as e:
+            self.elapsed_time = time.perf_counter() - start
+            logger.debug(f"Caught exception while running inference: {e}")
+            return PipelineResult(self.elapsed_time, PipelineError.MODEL_FAILURE)
+        self.elapsed_time = time.perf_counter() - start
+        return result
 
     @abstractmethod
-    @catch_model_failure
-    def run(self) -> PipelineResult:
+    def _run_impl(self) -> PipelineResult:
         pass
 
     def run_eval(self, iterations: int) -> Path:

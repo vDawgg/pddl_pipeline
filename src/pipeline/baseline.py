@@ -40,7 +40,7 @@ class Baseline(PipelineBase):
         logger.debug("Generated syntactically valid problem")
         return True
 
-    def run(self) -> PipelineResult:
+    def _run_impl(self) -> PipelineResult:
         domain, messages = make_request(
             domain_pompts[self.domain],
             self.model,
@@ -50,6 +50,7 @@ class Baseline(PipelineBase):
         )
         if not self.is_domain_valid(domain_file):
             return PipelineResult(
+                elapsed_time=self.elapsed_time,
                 error=PipelineError.DOMAIN_FAILURE,
                 domain_file=domain_file,
             )
@@ -64,6 +65,7 @@ class Baseline(PipelineBase):
         )
         if not self.is_problem_valid(domain_file, problem_file):
             return PipelineResult(
+                elapsed_time=self.elapsed_time,
                 error=PipelineError.PROBLEM_FAILURE,
                 domain_file=domain_file,
                 problem_file=problem_file,
@@ -73,12 +75,14 @@ class Baseline(PipelineBase):
         if isinstance(planner_output, FDErrorInfo):
             logger.debug("Failed to generate a plan")
             return PipelineResult(
+                elapsed_time=self.elapsed_time,
                 error=PipelineError.PLAN_FAILURE,
                 domain_file=domain_file,
                 problem_file=problem_file,
             )
         logger.debug("# Successfully generated a plan")
         return PipelineResult(
+            elapsed_time=self.elapsed_time,
             domain_file=domain_file,
             problem_file=problem_file,
             plan_file=planner_output,

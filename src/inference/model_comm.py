@@ -200,11 +200,14 @@ def parse_react_message(response: str) -> ReactResponse | None:
         and (tool_name := tool_name_block.search(response))
         and (tool_args := tool_args_block.search(response))
     ):
-        return ReactResponse(
-            thought=thought.group(1).strip(),
-            tool_name=tool_name.group(1).strip(),
-            tool_args=json.loads(tool_args.group(1).strip().replace("'", '"')),
-        )
+        try:
+            return ReactResponse(
+                thought=thought.group(1).strip(),
+                tool_name=tool_name.group(1).strip(),
+                tool_args=json.loads(tool_args.group(1).strip().replace("'", '"')),
+            )
+        except Exception:
+            return None
     return None
 
 
@@ -318,6 +321,7 @@ def make_react_workflow(
         prompt_with_trajectory = make_prompt_with_trajectory(
             input_prompt, parsed_responses, tool_results
         )
+        logger.debug(f"# Prompts with trajectory:\n{prompt_with_trajectory}")
         res = (
             client.chat.completions.create(
                 model=model_name,
@@ -334,16 +338,22 @@ def make_react_workflow(
 
         parsed_response = parse_react_message(res)
         if parsed_response is None:
-            logger.error("Assistant answered with malformed response")
+            logger.debug("Assistant answered with malformed response")
             # TODO: Think about what we actually want to do here
+            # TODO: We should also log these as results
             continue
 
         parsed_responses.append(parsed_response)
         if parsed_response.tool_name == "finish":
             break
-        tool_results.append(
-            tools_dict[parsed_response.tool_name](**parsed_response.tool_args)
-        )
+        try:
+            tool_results.append(
+                tools_dict[parsed_response.tool_name](**parsed_response.tool_args)
+            )
+        except Exception:
+            logger.debug("Assistant answered with unusable tool-call")
+            parsed_responses.pop()
+            continue
         logger.debug("# Tool Call")
         logger.debug(f"## Tool: {parsed_response.tool_name}")
         logger.debug(f"## Tool args: {parsed_response.tool_args}")
