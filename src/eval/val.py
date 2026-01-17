@@ -1,16 +1,30 @@
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from subprocess import PIPE, run
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
-class ValError:
+class ValErrorWarningBase:
     error_message: str
     pddl_line: str
+    pddl_line_num: int
 
-    def get_line_with_error(self) -> str:
-        return f"Line: {self.pddl_line}\nError Message: {self.error_message}\n"
+    def to_str(self) -> str:
+        return f"Line {self.pddl_line_num}: {self.pddl_line}\nError Message: {self.error_message}\n"
+
+
+@dataclass
+class ValError(ValErrorWarningBase):
+    pass
+
+
+@dataclass
+class ValWarning(ValErrorWarningBase):
+    pass
 
 
 @dataclass
@@ -18,15 +32,17 @@ class VALErrorInfo:
     num_errors: int
     num_warnings: int
     errors: list[ValError]
+    warnings: list[ValWarning]
 
     def get_lines_with_errors(self) -> str:
-        return "\n".join([e.get_line_with_error() for e in self.errors])
+        return "\n".join([e.to_str() for e in self.errors])
 
 
-def make_error_info(parser_output: str, lines: list[str]):
+def make_error_info(parser_output: str, lines: list[str], problem: bool = False):
     num_errors = 0
     num_warnings = 0
     errors = []
+    warnings = []
     for line in parser_output.strip().split("\n"):
         if line.startswith("Errors:"):
             match = re.match(r"Errors:\s*(\d+),\s*warnings:\s*(\d+)", line)
@@ -35,62 +51,51 @@ def make_error_info(parser_output: str, lines: list[str]):
                 num_warnings = int(match.group(2))
 
         elif ": Error:" in line or ": Warning:" in line:
+            if "domain" in line and problem is True:
+                continue
             match = re.search(r"line:\s*(\d+):\s*(Error|Warning):\s*(.+)", line)
             if match:
                 line_num = int(match.group(1)) - 1
                 error_type = match.group(2)
                 if error_type == "Warning":
+                    message = match.group(3)
+                    warnings.append(
+                        ValError(
+                            error_message=message.strip(),
+                            pddl_line=lines[line_num].strip(),
+                            pddl_line_num=line_num,
+                        )
+                    )
                     continue
                 message = match.group(3)
                 errors.append(
                     ValError(
                         error_message=message.strip(),
                         pddl_line=lines[line_num].strip(),
+                        pddl_line_num=line_num,
                     )
                 )
-    return VALErrorInfo(num_errors, num_warnings, errors)
+    return VALErrorInfo(num_errors, num_warnings, errors, warnings)
 
 
-def get_syntax_mistakes_domain(domain_file: Path | str) -> VALErrorInfo:
-    """
-    Check the provided PDDL domain file for syntax mistakes.
-    Syntax mistakes are returned with corresponding line annotations.
-
-    :param domain_file: path to the domain file
-    :type domain_file: Path | str
-    :return: possible syntax errors found in the domain file
-    :rtype: VALErrorInfo
-    """
+def get_syntax_mistakes_domain(domain_file: Path) -> VALErrorInfo:
     process = run(
         ["Parser", domain_file],
         stdout=PIPE,
         text=True,
     )
     with open(domain_file) as f:
-        error_info = make_error_info(process.stdout, f.readlines())
+        error_info = make_error_info(process.stdout, f.read().split("\n"))
     return error_info
 
 
-def get_syntax_mistakes_problem(
-    domain_file: Path | str, problem_file: Path | str
-) -> VALErrorInfo:
-    """
-    Check the provided problem file for syntax mistakes.
-    Note, that the domain file the problem is based on needs to be supplied as well.
-    Syntax mistakes are returned with corresponding line annotations.
-
-    :param domain_file: path to the domain file
-    :type domain_file: Path | str
-    :param problem_file: path to the problem file
-    :type problem_file: Path | str
-    :return: possible syntax errors found in the problem file
-    :rtype: VALErrorInfo
-    """
+def get_syntax_mistakes_problem(domain_file: Path, problem_file: Path) -> VALErrorInfo:
+    print(domain_file, problem_file)
     process = run(
         ["Parser", domain_file, problem_file],
         stdout=PIPE,
         text=True,
     )
     with open(problem_file) as f:
-        error_info = make_error_info(process.stdout, f.readlines())
+        error_info = make_error_info(process.stdout, f.read().split("\n"), True)
     return error_info
