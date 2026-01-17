@@ -21,7 +21,7 @@ x-llama-cpp-base: &llama-cpp-base
     start_period: 120s
 
 x-llama-cpp-common-env: &llama-cpp-common-env
-  LLAMA_ARG_CTX_SIZE: 8192
+  LLAMA_ARG_CTX_SIZE: 16384
   LLAMA_ARG_N_GPU_LAYERS: 99
   LLAMA_ARG_PORT: 8080
 
@@ -59,7 +59,7 @@ services:
 
   qwen_3_vl:
     <<: *llama-cpp-base
-    profiles: ["qwen_3_vl"]
+    profiles: ["qwen-3-vl"]
     command:
       - "--jinja"
       - "--top-k"
@@ -97,6 +97,24 @@ services:
       LLAMA_ARG_HF_REPO: unsloth/gemma-3-12b-it-GGUF
       LLAMA_ARG_HF_FILE: gemma-3-12b-it-Q5_K_M.gguf
 
+  gpt_oss:
+    <<: *llama-cpp-base
+    profiles: ["gpt-oss"]
+    command:
+      - "--jinja"
+      - "--temp"
+      - "1.0"
+      - "--top-k"
+      - "0"
+      - "--top-p"
+      - "1.0"
+      - "--flash-attn"
+      - "on"
+    environment:
+      <<: *llama-cpp-common-env
+      LLAMA_ARG_HF_REPO: unsloth/gpt-oss-20b-GGUF
+      LLAMA_ARG_HF_FILE: gpt-oss-20b-Q4_K_M.gguf
+
   pipeline_qwen_25_coder:
     <<: *pipeline-base
     profiles: ["qwen-2.5-coder"]
@@ -109,7 +127,7 @@ services:
 
   pipeline_qwen_3_vl:
     <<: *pipeline-base
-    profiles: ["qwen_3_vl"]
+    profiles: ["qwen-3-vl"]
     depends_on:
       qwen_3_vl:
         condition: service_healthy
@@ -126,3 +144,13 @@ services:
     environment:
       <<: *pipeline-common-env
       EVAL_MODEL: "gemma3"
+
+  pipeline_gpt_oss:
+    <<: *pipeline-base
+    profiles: ["gpt-oss"]
+    depends_on:
+      gpt_oss:
+        condition: service_healthy
+    environment:
+      <<: *pipeline-common-env
+      EVAL_MODEL: "gpt-oss"

@@ -1,11 +1,15 @@
+import logging
 from pathlib import Path
 
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
 from src.eval.fast_downward import FDErrorInfo, generate_plan
+from src.eval.val import get_syntax_mistakes_domain
 from src.inference.model_comm import make_react_workflow
 from src.pipeline.val_and_planner_feedback import ValAndPlannerFeedbackPipeline
-from src.utils.io import read_pddl_file, write_pddl_file
+from src.utils.io import write_pddl_file
 from src.utils.prompts import Prompts, get_prompt
+
+logger = logging.getLogger(__name__)
 
 
 class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
@@ -55,10 +59,11 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :rtype: str
         """
         self.read_pddl_file_calls += 1
-        if line_range is not None:
-            start, end = line_range
-            return read_pddl_file(Path(file))[start:end]
-        return read_pddl_file(Path(file))
+        with open(file) as f:
+            if line_range is not None:
+                start, end = line_range
+                return "".join(f.readlines()[start : end + 1])
+            return f.read()
 
     def edit_lines(self, file: str, line_range: tuple[int, int], replacement: str):
         """
@@ -71,7 +76,12 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :param replacement: The replacement string.
         :type replacement: str
         """
-        pass
+        self.edit_lines_calls += 1
+        with open(file, "r+") as f:
+            start, end = line_range
+            lines = f.readlines()
+            lines[start : end + 1] = [r + "\n" for r in replacement.split("\n")]
+            f.write("".join(lines))
 
     def finish(self):
         """
@@ -79,11 +89,20 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         """
         return
 
+    # TODO: We should probably experiment with separating / changing the instructions for the creation and fixing loops
+    # TODO: We can also try to steer the output with format requirements
     def run(self):
         make_react_workflow(
             model_name=self.model,
             input_prompt=get_prompt(Prompts.GENERATION_CONTEXT, Prompts.RING_AND_PEG),
-            tools=[self.create_pddl_file, self.read_pddl_file, self.finish],
+            tools=[
+                self.create_pddl_file,
+                self.read_pddl_file,
+                self.edit_lines,
+                get_syntax_mistakes_domain,
+                get_syntax_mistakes_domain,
+                self.finish,
+            ],
         )
         # TODO: We need to make this a unified definition. This discrepancy between the tool call and the other pipelines
         #       is not desirable.
@@ -94,14 +113,19 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         error = None
         plan = None
         if self.domain_file is None or not self.is_domain_valid(self.domain_file):
+            logger.debug("Failed to generate syntactically valid domain file")
             error = PipelineError.DOMAIN_FAILURE
         elif self.problem_file is None or not self.is_problem_valid(
             self.domain_file, self.problem_file
         ):
+            logger.debug("Failed to generate syntactically valid problem file")
             error = PipelineError.PROBLEM_FAILURE
         else:
             plan = generate_plan(self.domain_file, self.problem_file, self.name)
             if isinstance(plan, FDErrorInfo):
+                logger.debug(
+                    f"# Failed to generate solvable domain and problem: {plan.error_message}"
+                )
                 error = PipelineError.PLAN_FAILURE
                 plan = None
         return PipelineResult(

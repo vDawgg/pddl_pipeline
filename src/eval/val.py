@@ -51,7 +51,16 @@ def make_error_info(parser_output: str, lines: list[str]):
     return VALErrorInfo(num_errors, num_warnings, errors)
 
 
-def get_syntax_mistakes_domain(domain_file: Path) -> VALErrorInfo:
+def get_syntax_mistakes_domain(domain_file: Path | str) -> VALErrorInfo:
+    """
+    Check the provided PDDL domain file for syntax mistakes.
+    Syntax mistakes are returned with corresponding line annotations.
+
+    :param domain_file: path to the domain file
+    :type domain_file: Path | str
+    :return: possible syntax errors found in the domain file
+    :rtype: VALErrorInfo
+    """
     process = run(
         ["Parser", domain_file],
         stdout=PIPE,
@@ -62,7 +71,21 @@ def get_syntax_mistakes_domain(domain_file: Path) -> VALErrorInfo:
     return error_info
 
 
-def get_syntax_mistakes_problem(domain_file: Path, problem_file: Path) -> VALErrorInfo:
+def get_syntax_mistakes_problem(
+    domain_file: Path | str, problem_file: Path | str
+) -> VALErrorInfo:
+    """
+    Check the provided problem file for syntax mistakes.
+    Note, that the domain file the problem is based on needs to be supplied as well.
+    Syntax mistakes are returned with corresponding line annotations.
+
+    :param domain_file: path to the domain file
+    :type domain_file: Path | str
+    :param problem_file: path to the problem file
+    :type problem_file: Path | str
+    :return: possible syntax errors found in the problem file
+    :rtype: VALErrorInfo
+    """
     process = run(
         ["Parser", domain_file, problem_file],
         stdout=PIPE,

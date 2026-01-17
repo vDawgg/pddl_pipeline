@@ -203,7 +203,7 @@ def parse_react_message(response: str) -> ReactResponse | None:
         return ReactResponse(
             thought=thought.group(1).strip(),
             tool_name=tool_name.group(1).strip(),
-            tool_args=json.loads(tool_args.group(1).strip()),
+            tool_args=json.loads(tool_args.group(1).strip().replace("'", '"')),
         )
     return None
 
@@ -288,6 +288,8 @@ def make_request[T](
 
 # TODO: This might have to be dumbed down with the logic transferred to the pipeline
 #       Otherwise we might have problems with the structure here.
+# TODO: Try with native openai tool-calling as well
+#       -> This structure seems to be supported by most of the newer models.
 def make_react_workflow(
     model_name: str,
     input_prompt: str,
@@ -300,8 +302,6 @@ def make_react_workflow(
     unformatted_base_prompt = get_prompt(Prompts.REACT_BASE)
     base_prompt = unformatted_base_prompt.format(tools=tools_json)
     input_prompt = base_prompt + input_prompt
-    logger.debug("# User Message")
-    logger.debug(input_prompt)
 
     key_path = project_root / provider_keys[model_name]
     if not key_path.exists():
@@ -315,15 +315,14 @@ def make_react_workflow(
     parsed_responses = []
     tool_results = []
     for _ in range(max_iters):
+        prompt_with_trajectory = make_prompt_with_trajectory(
+            input_prompt, parsed_responses, tool_results
+        )
         res = (
             client.chat.completions.create(
                 model=model_name,
                 messages=[
-                    make_user_message(
-                        make_prompt_with_trajectory(
-                            input_prompt, parsed_responses, tool_results
-                        )
-                    )  # type: ignore
+                    make_user_message(prompt_with_trajectory)  # type: ignore
                 ],
             )
             .choices[0]
@@ -342,9 +341,12 @@ def make_react_workflow(
         parsed_responses.append(parsed_response)
         if parsed_response.tool_name == "finish":
             break
-        # TODO: We have to assert that tool results can only ever be strings or None
         tool_results.append(
             tools_dict[parsed_response.tool_name](**parsed_response.tool_args)
         )
+        logger.debug("# Tool Call")
+        logger.debug(f"## Tool: {parsed_response.tool_name}")
+        logger.debug(f"## Tool args: {parsed_response.tool_args}")
+        logger.debug(f"## Tool result: {tool_results[-1]}")
     assert res is not None
     return res.strip()
