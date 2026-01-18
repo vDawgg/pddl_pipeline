@@ -222,3 +222,5 @@ pddl/generated/*
 !pddl/generated/.gitkeep
 results/*
 !results/.gitkeep
+logs/*
+!logs/.gitkeep

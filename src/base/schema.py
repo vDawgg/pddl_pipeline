@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum, auto
 from pathlib import Path
 
@@ -12,6 +12,8 @@ class PipelineError(StrEnum):
     DOMAIN_FAILURE = auto()
     PROBLEM_FAILURE = auto()
     PLAN_FAILURE = auto()
+    PLAN_FAILURE_TRANSLATE = auto()
+    PLAN_FAILURE_UNSOLVABLE = auto()
     MODEL_FAILURE = auto()
 
 
@@ -23,20 +25,10 @@ class PipelineResult:
     domain_file: Path | None = None
     problem_file: Path | None = None
     plan_file: Path | None = None
-    num_domain_fixes: int | None = None
-    num_problem_fixes: int | None = None
-    num_planner_fixes: int | None = None
-    _number_of_fixes: int | None = field(default=None, repr=False)
-
-    @property
-    def number_of_fixes(self) -> int | None:
-        if self._number_of_fixes is not None:
-            return self._number_of_fixes
-        counts = [self.num_domain_fixes, self.num_problem_fixes, self.num_planner_fixes]
-        if all(c is None for c in counts):
-            return None
-        return sum(c or 0 for c in counts)
-
-    @number_of_fixes.setter
-    def number_of_fixes(self, value: int | None) -> None:
-        self._number_of_fixes = value
+    log_file: Path | None = None
+    create_pddl_file_calls: int = 0
+    read_pddl_file_calls: int = 0
+    edit_lines_calls: int = 0
+    domain_syntax_errors_calls: int = 0
+    problem_syntax_mistakes_calls: int = 0
+    generate_plan_calls: int = 0

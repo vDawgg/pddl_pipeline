@@ -14,6 +14,8 @@ class ToolCallPipelineMutltiAgent(ToolCallPipeline):
         self.name = "tool_call_pipeline_multi_agent"
 
     def _run_impl(self) -> PipelineResult:
+        # FIXME: The current context here seems to broad. The model is already trying to generate the problem file if the creation
+        #        of the domain file was successfull.
         self.make_react_workflow(
             input_prompt=get_prompt(
                 Prompts.GENERATION_CONTEXT_TOOLS, Prompts.RING_AND_PEG_DOMAIN
@@ -28,7 +30,6 @@ class ToolCallPipelineMutltiAgent(ToolCallPipeline):
         if self.domain_file is None or not self.is_domain_valid(self.domain_file):
             return self.create_result(
                 error=PipelineError.DOMAIN_FAILURE,
-                _number_of_fixes=self.get_total_tool_calls(),
             )
         assert self.domain_file is not None
         domain_info = (
@@ -52,7 +53,6 @@ class ToolCallPipelineMutltiAgent(ToolCallPipeline):
         ):
             return self.create_result(
                 error=PipelineError.PROBLEM_FAILURE,
-                _number_of_fixes=self.get_total_tool_calls(),
             )
         assert self.problem_file is not None
         plan_prompt = get_prompt(
@@ -72,10 +72,7 @@ class ToolCallPipelineMutltiAgent(ToolCallPipeline):
                 f"# Failed to generate solvable domain and problem: {plan.error_message}"
             )
             return self.create_result(
-                error=PipelineError.PLAN_FAILURE,
-                _number_of_fixes=self.get_total_tool_calls(),
+                error=plan.to_pipeline_error(),
             )
         self.plan_file = plan
-        return self.create_result(
-            _number_of_fixes=self.get_total_tool_calls(),
-        )
+        return self.create_result()

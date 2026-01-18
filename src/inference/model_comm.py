@@ -291,6 +291,7 @@ def make_request[T](
 
 # TODO: Try with native openai tool-calling as well
 #       -> This structure seems to be supported by most of the newer models.
+# TODO: Experiment with the size of the context trajectory
 def make_react_workflow(
     model_name: str,
     input_prompt: str,

@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from tqdm import tqdm
 
 from src.base.schema import PipelineError, PipelineResult
-from src.constants import results_dir
+from src.constants import logs_dir, results_dir
 from src.inference import Models
 from src.inference.model_comm import (
     make_react_workflow as _make_react_workflow,
@@ -20,6 +20,7 @@ from src.inference.model_comm import (
     make_request as _make_request,
 )
 from src.utils.domains import Domains
+from src.utils.logger import add_file_handler, remove_file_handler
 from src.utils.timestamp import get_current_timestamp
 
 logger = logging.getLogger(__name__)
@@ -46,45 +47,68 @@ class PipelineBase(ABC):
         self.name = f"{self.domain}_{self.pipeline}_{self.model}"
         self.elapsed_time: float = 0.0
         self.num_model_calls: int = 0
+        self.create_pddl_file_calls = 0
+        self.read_pddl_file_calls = 0
+        self.edit_lines_calls = 0
+        self.domain_syntax_errors_calls = 0
+        self.problem_syntax_mistakes_calls = 0
+        self.generate_plan_calls = 0
         self.domain_file: Path | None = None
         self.problem_file: Path | None = None
         self.plan_file: Path | None = None
+        self.log_file: Path | None = None
 
     def create_result(
         self,
         error: PipelineError | None = None,
-        num_domain_fixes: int | None = None,
-        num_problem_fixes: int | None = None,
-        num_planner_fixes: int | None = None,
-        _number_of_fixes: int | None = None,
     ) -> PipelineResult:
-        return PipelineResult(
+        res = PipelineResult(
             elapsed_time=self.elapsed_time,
             num_model_calls=self.num_model_calls,
             error=error,
             domain_file=self.domain_file,
             problem_file=self.problem_file,
             plan_file=self.plan_file,
-            num_domain_fixes=num_domain_fixes,
-            num_problem_fixes=num_problem_fixes,
-            num_planner_fixes=num_planner_fixes,
-            _number_of_fixes=_number_of_fixes,
+            log_file=self.log_file,
+            create_pddl_file_calls=self.create_pddl_file_calls,
+            read_pddl_file_calls=self.read_pddl_file_calls,
+            edit_lines_calls=self.edit_lines_calls,
+            domain_syntax_errors_calls=self.domain_syntax_errors_calls,
+            problem_syntax_mistakes_calls=self.problem_syntax_mistakes_calls,
+            generate_plan_calls=self.generate_plan_calls,
         )
+
+        return res
 
     def run(self) -> PipelineResult:
         self.num_model_calls = 0
+        self.create_pddl_file_calls = 0
+        self.read_pddl_file_calls = 0
+        self.edit_lines_calls = 0
+        self.domain_syntax_errors_calls = 0
+        self.problem_syntax_mistakes_calls = 0
+        self.generate_plan_calls = 0
         self.domain_file = None
         self.problem_file = None
         self.plan_file = None
+        self.log_file = logs_dir / f"{self.name}_{get_current_timestamp()}.log"
+        file_handler = add_file_handler(self.log_file)
         start = time.perf_counter()
         try:
             result = self._run_impl()
         except Exception as e:
             self.elapsed_time = time.perf_counter() - start
             logger.debug(f"Caught exception while running inference: {e}")
-            return self.create_result(error=PipelineError.MODEL_FAILURE)
-        self.elapsed_time = time.perf_counter() - start
+            result = self.create_result(error=PipelineError.MODEL_FAILURE)
+        else:
+            self.elapsed_time = time.perf_counter() - start
+        finally:
+            remove_file_handler(file_handler)
         return result
+
+    @abstractmethod
+    def _run_impl(self) -> PipelineResult:
+        pass
 
     def make_request(
         self,
@@ -116,10 +140,6 @@ class PipelineBase(ABC):
         )
         self.num_model_calls += num_calls
         return result
-
-    @abstractmethod
-    def _run_impl(self) -> PipelineResult:
-        pass
 
     def run_eval(self, iterations: int) -> Path:
         results: list[PipelineResult] = []

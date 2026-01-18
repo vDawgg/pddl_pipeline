@@ -9,7 +9,7 @@ from pathlib import Path
 from subprocess import run
 from tempfile import NamedTemporaryFile
 
-from src.base.schema import PDDLFiles
+from src.base.schema import PDDLFiles, PipelineError
 from src.constants import plans_dir
 from src.utils.timestamp import get_current_timestamp
 
@@ -39,6 +39,20 @@ class ExitCodes(StrEnum):
     DRIVER_CRITICAL_ERROR = auto()
     DRIVER_INPUT_ERROR = auto()
     DRIVER_UNSUPPORTED = auto()
+
+
+def is_translate_error(code: ExitCodes):
+    return (
+        code == ExitCodes.TRANSLATE_CRITICAL_ERROR
+        or code == ExitCodes.TRANSLATE_INPUT_ERROR
+    )
+
+
+def is_unsolvable(code: ExitCodes):
+    return (
+        code == ExitCodes.SEARCH_UNSOLVABLE
+        or code == ExitCodes.SEARCH_UNSOLVED_INCOMPLETE
+    )
 
 
 exit_codes = {
@@ -89,12 +103,16 @@ class FDErrorInfo:
     def to_str(self):
         return f"Fast Downward was unable to generate a plan.\n# Error message: {self.error_message}\n# Affected file: {self.file}\n"
 
+    def to_pipeline_error(self) -> PipelineError:
+        if is_translate_error(self.exit_code):
+            return PipelineError.PLAN_FAILURE_TRANSLATE
+        elif is_unsolvable(self.exit_code):
+            return PipelineError.PLAN_FAILURE_UNSOLVABLE
+        return PipelineError.PLAN_FAILURE
+
 
 def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
-    if (
-        fd_code == ExitCodes.TRANSLATE_CRITICAL_ERROR
-        or fd_code == ExitCodes.TRANSLATE_INPUT_ERROR
-    ):
+    if is_translate_error(fd_code):
         current_file = None
         lines = output.strip().split("\n")
         for i, line in enumerate(lines):
@@ -116,10 +134,7 @@ def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
                     current_file,
                 )
         return FDErrorInfo(fd_code, "Error in PDDL translation")
-    elif (
-        fd_code == ExitCodes.SEARCH_UNSOLVABLE
-        or fd_code == ExitCodes.SEARCH_UNSOLVED_INCOMPLETE
-    ):
+    elif is_unsolvable(fd_code):
         return FDErrorInfo(
             fd_code,
             "Could not find a suitable plan",
@@ -158,6 +173,7 @@ def generate_plan(
     fd_code = exit_codes[process.returncode]
     # TODO: In addition to the error parsing here, we should also include parsing for the planning statistics.
     #       i.e. how long did the planning take, how many steps etc. if this is a sensible comparison
+    #       -> This is likely not going to make a big difference and should be kept for very late down the line
     if (
         fd_code == ExitCodes.SUCCESS
         or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY

@@ -63,7 +63,7 @@ class Baseline(PipelineBase):
         planner_output = generate_plan(self.domain_file, self.problem_file, self.name)
         if isinstance(planner_output, FDErrorInfo):
             logger.debug("Failed to generate a plan")
-            return self.create_result(error=PipelineError.PLAN_FAILURE)
+            return self.create_result(error=planner_output.to_pipeline_error())
         logger.debug("# Successfully generated a plan")
         self.plan_file = planner_output
         return self.create_result()

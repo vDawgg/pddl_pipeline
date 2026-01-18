@@ -21,15 +21,14 @@ class ValFeedbackPipeline(Baseline):
     ):
         super().__init__(model, domain, pipeline or Pipelines.VAL_FEEDBACK)
 
-    def fix_domain(self, domain_file: Path, num_tries: int = 5) -> int:
-        iterations = 0
+    def fix_domain(self, domain_file: Path, num_tries: int = 5):
         for i in range(num_tries):
             err_info = get_syntax_mistakes_domain(domain_file)
+            self.domain_syntax_errors_calls += 1
             if err_info.num_errors == 0:
                 break
             else:
                 logger.debug(f"Iterations domain syntax fixes: {i}")
-                iterations = i
                 prompt = get_prompt(
                     Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_DOMAIN
                 ).format(
@@ -40,19 +39,15 @@ class ValFeedbackPipeline(Baseline):
                     prompt,
                 )
                 domain_file = write_pddl_file(domain, file=domain_file)
-        return iterations
 
-    def fix_problem(
-        self, domain_file: Path, problem_file: Path, num_tries: int = 5
-    ) -> int:
-        iterations = 0
+    def fix_problem(self, domain_file: Path, problem_file: Path, num_tries: int = 5):
         for i in range(num_tries):
             err_info = get_syntax_mistakes_problem(domain_file, problem_file)
+            self.problem_syntax_mistakes_calls += 1
             if err_info.num_errors == 0:
                 break
             else:
                 logger.debug(f"Iterations problem syntax fixes: {i}")
-                iterations = i
                 prompt = get_prompt(
                     Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_DOMAIN
                 ).format(
@@ -64,7 +59,6 @@ class ValFeedbackPipeline(Baseline):
                     prompt,
                 )
                 problem_file = write_pddl_file(problem, file=problem_file)
-        return iterations
 
     def _run_impl(self) -> PipelineResult:
         domain, messages = self.make_request(
@@ -73,11 +67,10 @@ class ValFeedbackPipeline(Baseline):
         self.domain_file = write_pddl_file(
             domain, name=self.name, pddl_file_type=PDDLFiles.DOMAIN
         )
-        domain_iters = self.fix_domain(self.domain_file)
+        self.fix_domain(self.domain_file)
         if not self.is_domain_valid(self.domain_file):
             return self.create_result(
                 error=PipelineError.DOMAIN_FAILURE,
-                num_domain_fixes=domain_iters,
             )
 
         problem, messages = self.make_request(
@@ -87,25 +80,18 @@ class ValFeedbackPipeline(Baseline):
         self.problem_file = write_pddl_file(
             problem, name=self.name, pddl_file_type=PDDLFiles.PROBLEM
         )
-        problem_iters = self.fix_problem(self.domain_file, self.problem_file)
+        self.fix_problem(self.domain_file, self.problem_file)
         if not self.is_problem_valid(self.domain_file, self.problem_file):
             return self.create_result(
                 error=PipelineError.DOMAIN_FAILURE,
-                num_domain_fixes=domain_iters,
-                num_problem_fixes=problem_iters,
             )
 
         planner_output = generate_plan(self.domain_file, self.problem_file, self.name)
         if isinstance(planner_output, FDErrorInfo):
             logger.debug("Failed to generate a plan")
             return self.create_result(
-                error=PipelineError.PLAN_FAILURE,
-                num_domain_fixes=domain_iters,
-                num_problem_fixes=problem_iters,
+                error=planner_output.to_pipeline_error(),
             )
         logger.debug("# Successfully generated a plan")
         self.plan_file = planner_output
-        return self.create_result(
-            num_domain_fixes=domain_iters,
-            num_problem_fixes=problem_iters,
-        )
+        return self.create_result()

@@ -71,11 +71,13 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
         domain_file: Path,
         problem_file: Path,
         num_tries: int = 5,
-    ) -> tuple[FDErrorInfo | Path, int]:
+    ) -> FDErrorInfo | Path:
         assert num_tries > 0
         iterations = 0
-        planner_output = generate_plan(domain_file, problem_file, self.name)
-        for i in range(num_tries - 1):
+        planner_output = None
+        for i in range(num_tries):
+            planner_output = generate_plan(domain_file, problem_file, self.name)
+            self.generate_plan_calls += 1
             if type(planner_output) is str:
                 break
             elif type(planner_output) is FDErrorInfo and planner_output.exit_code in [
@@ -91,8 +93,8 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
                 iterations = i + 1
                 self.fix_plan_not_found(domain_file, problem_file)
             logger.debug(f"Iterations planning fixes: {iterations}")
-            planner_output = generate_plan(domain_file, problem_file, self.name)
-        return planner_output, iterations
+        assert planner_output is not None
+        return planner_output
 
     def _run_impl(self) -> PipelineResult:
         domain, messages = self.make_request(
@@ -101,11 +103,10 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
         self.domain_file = write_pddl_file(
             domain, name=self.name, pddl_file_type=PDDLFiles.DOMAIN
         )
-        domain_iters = self.fix_domain(self.domain_file)
+        self.fix_domain(self.domain_file)
         if not self.is_domain_valid(self.domain_file):
             return self.create_result(
                 error=PipelineError.DOMAIN_FAILURE,
-                num_domain_fixes=domain_iters,
             )
 
         problem, messages = self.make_request(
@@ -115,31 +116,19 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
         self.problem_file = write_pddl_file(
             problem, name=self.name, pddl_file_type=PDDLFiles.PROBLEM
         )
-        problem_iters = self.fix_problem(self.domain_file, self.problem_file)
+        self.fix_problem(self.domain_file, self.problem_file)
         if not self.is_problem_valid(self.domain_file, self.problem_file):
             logger.debug("Problem failure")
             return self.create_result(
                 error=PipelineError.PROBLEM_FAILURE,
-                num_domain_fixes=domain_iters,
-                num_problem_fixes=problem_iters,
             )
 
-        # TODO: It might be cleaner to implement a is_plan_valid method here as well.
-        planner_output, planner_iters = self.fix_planning(
-            self.domain_file, self.problem_file
-        )
+        planner_output = self.fix_planning(self.domain_file, self.problem_file)
         if isinstance(planner_output, FDErrorInfo):
             logger.debug("Failed to generate a plan")
             return self.create_result(
-                error=PipelineError.PLAN_FAILURE,
-                num_domain_fixes=domain_iters,
-                num_problem_fixes=problem_iters,
-                num_planner_fixes=planner_iters,
+                error=planner_output.to_pipeline_error(),
             )
         logger.debug("# Successfully generated a plan")
         self.plan_file = planner_output
-        return self.create_result(
-            num_domain_fixes=domain_iters,
-            num_problem_fixes=problem_iters,
-            num_planner_fixes=planner_iters,
-        )
+        return self.create_result()

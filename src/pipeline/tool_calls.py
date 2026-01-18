@@ -17,23 +17,6 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
     def __init__(self, model, domain, pipeline=None):
         super().__init__(model, domain, pipeline)
         self.name = "tool_call_pipeline"
-        self.create_pddl_file_calls = 0
-        self.read_pddl_file_calls = 0
-        self.edit_lines_calls = 0
-        self.get_syntax_mistakes_domain_calls = 0
-        self.get_syntax_mistakes_problem_calls = 0
-        self.generate_plan_calls = 0
-        self.tool_calls = [
-            self.create_pddl_file_calls,
-            self.read_pddl_file_calls,
-            self.edit_lines_calls,
-            self.get_syntax_mistakes_domain_calls,
-            self.get_syntax_mistakes_problem_calls,
-            self.generate_plan_calls,
-        ]
-
-    def get_total_tool_calls(self) -> int:
-        return sum(c or 0 for c in self.tool_calls)
 
     # Tools
     def create_pddl_file(self, content: str, pddl_file_type: PDDLFiles) -> str:
@@ -58,6 +41,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
             self.problem_file = file_path
         return file_path._str
 
+    # TODO: We might need a file viewer instead
     def read_pddl_file(
         self, file: str, line_range: tuple[int, int] | None = None
     ) -> str:
@@ -79,7 +63,16 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
                 return "".join(f.readlines()[start : end + 1])
             return f.read()
 
-    def edit_lines(self, file: str, line_range: tuple[int, int], replacement: str):
+    # TODO: It might be a good idea to not use line-ranges here and instead work with replacement strings.
+    #       -> Not done by SWE-agent, but aider shows good benchmark resutls. Might be interesting to try.
+    # TODO: Only apply an edit, if the edit did not introduce additional syntax mistakes. For this, we need to keep an index of
+    #       the mistakes currently present in the file.
+    #       -> We still have to think of how we want to answer in cases, where no mistakes are added or mistakes are even fixed.
+    # TODO: Possibly encourage single-line edits by providing an optional 'line' arg to only change one line.
+    #       -> This is already possible with the range, but might not get picked up correctly by the model currently.
+    def edit_lines(
+        self, file: str, line_range: tuple[int, int], replacement: str
+    ) -> str:
         """
         Replace the lines of a file in a given range with the specified replacement string.
 
@@ -89,6 +82,8 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :type line_range: tuple[int, int]
         :param replacement: The replacement string.
         :type replacement: str
+        :return: A snippet showing the updated code
+        :rtype: str
         """
         self.edit_lines_calls += 1
         with open(file, "r+") as f:
@@ -98,6 +93,10 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
             f.seek(0)
             f.truncate()
             f.write("".join(lines))
+            start_snippet = start - 4 if (start - 4) > 0 else 0
+            end_snippet = end + 4 if (end + 4) < len(lines) else len(lines)
+            snippet = "".join(lines[start_snippet:end_snippet])
+            return f"Edit successfully applied.\nSnippet containing changes:\n{snippet}"
 
     def get_syntax_mistakes_domain(self, domain_file: str) -> str:
         """
@@ -109,7 +108,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :return: possible syntax errors found in the domain file
         :rtype: str
         """
-        self.get_syntax_mistakes_domain_calls += 1
+        self.domain_syntax_errors_calls += 1
         err_info = _get_syntax_mistakes_domain(Path(domain_file))
         if err_info.num_errors > 0:
             return err_info.get_lines_with_errors()
@@ -128,7 +127,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :return: possible syntax errors found in the problem file
         :rtype: str
         """
-        self.get_syntax_mistakes_problem_calls += 1
+        self.problem_syntax_mistakes_calls += 1
         err_info = _get_syntax_mistakes_problem(Path(domain_file), Path(problem_file))
         if err_info.num_errors > 0:
             return err_info.get_lines_with_errors()
@@ -187,10 +186,9 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
                 logger.debug(
                     f"# Failed to generate solvable domain and problem: {plan.error_message}"
                 )
-                error = PipelineError.PLAN_FAILURE
+                error = plan.to_pipeline_error()
             else:
                 self.plan_file = plan
         return self.create_result(
             error=error,
-            _number_of_fixes=self.get_total_tool_calls(),
         )
