@@ -7,5 +7,6 @@ Make sure to adhere to the naming of objects and actions given in the prompt. No
 Additionally, make sure your output is complete and can be used by a solver to generate a plan once both domain and problem files have been generated. This means including a full definition of the actions, predicates and other PDDL attributes you deem necessary to complete the task.
 
 After creating the files, verify that they do not contain syntax mistakes. If they do contain mistakes, edit the files to fix them.
+Additionally, ensure that the generated problem defined int the combination of PDDL domain and problem file is actually sovlable using the Fast Downward planning system.
 
 All PDDL files have to adhere to the PDDL 2.1 standard.

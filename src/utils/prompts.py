@@ -12,6 +12,7 @@ class Prompts(StrEnum):
     RING_AND_PEG = "ring_and_peg.md"
     RING_AND_PEG_DOMAIN = "ring_and_peg_domain.md"
     RING_AND_PEG_PROBLEM = "ring_and_peg_problem.md"
+    RING_AND_PEG_PLAN = "ring_and_peg_plan.md"
     VAL_FEEDBACK_CONTEXT = "val_feedback_context.md"
     VAL_FEEDBACK_DOMAIN = "val_feedback_domain.md"
     VAL_FEEDBACK_PROBLEM = "val_feedback_problem.md"

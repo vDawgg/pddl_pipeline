@@ -86,6 +86,9 @@ class FDErrorInfo:
         self.error_message = error_message
         self.file = file
 
+    def to_str(self):
+        return f"Fast Downward was unable to generate a plan.\n# Error message: {self.error_message}\n# Affected file: {self.file}\n"
+
 
 def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
     if (

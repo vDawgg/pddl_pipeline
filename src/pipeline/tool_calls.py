@@ -2,8 +2,10 @@ import logging
 from pathlib import Path
 
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
-from src.eval.fast_downward import FDErrorInfo, generate_plan
-from src.eval.val import get_syntax_mistakes_domain, get_syntax_mistakes_problem
+from src.eval.fast_downward import FDErrorInfo
+from src.eval.fast_downward import generate_plan as _generate_plan
+from src.eval.val import get_syntax_mistakes_domain as _get_syntax_mistakes_domain
+from src.eval.val import get_syntax_mistakes_problem as _get_syntax_mistakes_problem
 from src.pipeline.val_and_planner_feedback import ValAndPlannerFeedbackPipeline
 from src.utils.io import write_pddl_file
 from src.utils.prompts import Prompts, get_prompt
@@ -20,12 +22,14 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         self.edit_lines_calls = 0
         self.get_syntax_mistakes_domain_calls = 0
         self.get_syntax_mistakes_problem_calls = 0
+        self.generate_plan_calls = 0
         self.tool_calls = [
             self.create_pddl_file_calls,
             self.read_pddl_file_calls,
             self.edit_lines_calls,
             self.get_syntax_mistakes_domain_calls,
             self.get_syntax_mistakes_problem_calls,
+            self.generate_plan_calls,
         ]
 
     def get_total_tool_calls(self) -> int:
@@ -106,7 +110,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :rtype: str
         """
         self.get_syntax_mistakes_domain_calls += 1
-        err_info = get_syntax_mistakes_domain(Path(domain_file))
+        err_info = _get_syntax_mistakes_domain(Path(domain_file))
         if err_info.num_errors > 0:
             return err_info.get_lines_with_errors()
         return "No syntax mistakes found in domain file."
@@ -125,10 +129,29 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :rtype: str
         """
         self.get_syntax_mistakes_problem_calls += 1
-        err_info = get_syntax_mistakes_problem(Path(domain_file), Path(problem_file))
+        err_info = _get_syntax_mistakes_problem(Path(domain_file), Path(problem_file))
         if err_info.num_errors > 0:
             return err_info.get_lines_with_errors()
         return "No syntax mistakes found in domain file."
+
+    def generate_plan(self, domain_file: str, problem_file: str) -> str:
+        """
+        Try to generate a plan given a domain and problem file using the fast downward planning system.
+        The function either answers witht the path to the generated plan if successfull or with error information if planning was unsuccessfull.
+        The main types of errors that happen either stem from the plan / domain containing syntax mistakes or the domain / problem being ill-defined leading to the planner not being able to find a plan.
+
+        :param domain_file: the path to the domain file
+        :type domain_file: str
+        :param problem_file: the path to the problem file
+        :type problem_file: str
+        :return: The path to the problem file or an error description
+        :rtype: str
+        """
+        self.generate_plan_calls += 1
+        plan_output = _generate_plan(Path(domain_file), Path(problem_file), self.name)
+        if isinstance(plan_output, FDErrorInfo):
+            return plan_output.to_str()
+        return f"Fast Downward successfully generated a plan under {plan_output}"
 
     def finish(self):
         """
@@ -136,31 +159,20 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         """
         return
 
-    # TODO: We should probably experiment with separating / changing the instructions for the creation and fixing loops
-    # TODO: We can also try to steer the output with format requirements
     def _run_impl(self) -> PipelineResult:
         self.make_react_workflow(
-            input_prompt=get_prompt(Prompts.GENERATION_CONTEXT, Prompts.RING_AND_PEG),
+            input_prompt=get_prompt(
+                Prompts.GENERATION_CONTEXT_TOOLS, Prompts.RING_AND_PEG
+            ),
             tools=[
                 self.create_pddl_file,
                 self.read_pddl_file,
                 self.edit_lines,
                 self.get_syntax_mistakes_domain,
                 self.get_syntax_mistakes_problem,
+                self.generate_plan,
                 self.finish,
             ],
-        )
-        # TODO: We need to make this a unified definition. This discrepancy between the tool call and the other pipelines
-        #       is not desirable.
-        #       -> The calls below could possibly just be gathered into one file-editing count / bucket
-        logger.debug(f"# Create PDDL file calls: {self.create_pddl_file_calls}")
-        logger.debug(f"# Read PDDL file calls: {self.read_pddl_file_calls}")
-        logger.debug(f"# Edit lines calls: {self.edit_lines_calls}")
-        logger.debug(
-            f"# Get syntax mistakes domain calls: {self.get_syntax_mistakes_domain_calls}"
-        )
-        logger.debug(
-            f"# Get syntax mistakes problem calls: {self.get_syntax_mistakes_problem_calls}"
         )
         error = None
         if self.domain_file is None or not self.is_domain_valid(self.domain_file):
@@ -170,7 +182,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         ):
             error = PipelineError.PROBLEM_FAILURE
         else:
-            plan = generate_plan(self.domain_file, self.problem_file, self.name)
+            plan = _generate_plan(self.domain_file, self.problem_file, self.name)
             if isinstance(plan, FDErrorInfo):
                 logger.debug(
                     f"# Failed to generate solvable domain and problem: {plan.error_message}"
@@ -180,12 +192,5 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
                 self.plan_file = plan
         return self.create_result(
             error=error,
-            _number_of_fixes=sum(
-                c or 0
-                for c in [
-                    self.create_pddl_file_calls,
-                    self.read_pddl_file_calls,
-                    self.edit_lines_calls,
-                ]
-            ),
+            _number_of_fixes=self.get_total_tool_calls(),
         )

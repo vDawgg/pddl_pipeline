@@ -90,7 +90,6 @@ def get_syntax_mistakes_domain(domain_file: Path) -> VALErrorInfo:
 
 
 def get_syntax_mistakes_problem(domain_file: Path, problem_file: Path) -> VALErrorInfo:
-    print(domain_file, problem_file)
     process = run(
         ["Parser", domain_file, problem_file],
         stdout=PIPE,

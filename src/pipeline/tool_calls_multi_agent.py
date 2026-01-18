@@ -32,7 +32,7 @@ class ToolCallPipelineMutltiAgent(ToolCallPipeline):
             )
         assert self.domain_file is not None
         domain_info = (
-            f"The previously generated domain can be found under: {self.domain_file}"
+            f"The previously generated domain can be found under: {self.domain_file}\n"
         )
         self.make_react_workflow(
             input_prompt=get_prompt(
@@ -55,6 +55,17 @@ class ToolCallPipelineMutltiAgent(ToolCallPipeline):
                 _number_of_fixes=self.get_total_tool_calls(),
             )
         assert self.problem_file is not None
+        plan_prompt = get_prompt(
+            Prompts.GENERATION_CONTEXT_TOOLS, Prompts.RING_AND_PEG_PLAN
+        ).format(domain=self.domain_file, problem=self.problem_file)
+        self.make_react_workflow(
+            input_prompt=plan_prompt,
+            tools=[
+                self.read_pddl_file,
+                self.edit_lines,
+                self.generate_plan,
+            ],
+        )
         plan = generate_plan(self.domain_file, self.problem_file, self.name)
         if isinstance(plan, FDErrorInfo):
             logger.debug(
