@@ -104,6 +104,7 @@ class PipelineBase(ABC):
             self.elapsed_time = time.perf_counter() - start
         finally:
             remove_file_handler(file_handler)
+        result.elapsed_time = self.elapsed_time
         return result
 
     @abstractmethod

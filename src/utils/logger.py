@@ -2,18 +2,20 @@ import logging
 from pathlib import Path
 
 
-def configure_logging(level: int = logging.INFO) -> None:
-    logging.basicConfig(
-        level=logging.WARNING,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        force=True,
+def configure_logging(console_level: int = logging.INFO) -> None:
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(console_level)
+    console_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     )
-
     app_logger = logging.getLogger("src")
-    app_logger.setLevel(level)
-
+    app_logger.setLevel(logging.DEBUG)
+    app_logger.addHandler(console_handler)
     main_logger = logging.getLogger("__main__")
-    main_logger.setLevel(level)
+    main_logger.setLevel(console_level)
+    main_logger.addHandler(console_handler)
 
 
 def add_file_handler(log_file: Path, level: int = logging.DEBUG) -> logging.FileHandler:

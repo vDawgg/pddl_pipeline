@@ -131,7 +131,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         err_info = _get_syntax_mistakes_problem(Path(domain_file), Path(problem_file))
         if err_info.num_errors > 0:
             return err_info.get_lines_with_errors()
-        return "No syntax mistakes found in domain file."
+        return "No syntax mistakes found in problem file."
 
     def generate_plan(self, domain_file: str, problem_file: str) -> str:
         """
@@ -172,6 +172,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
                 self.generate_plan,
                 self.finish,
             ],
+            max_iters=20,
         )
         error = None
         if self.domain_file is None or not self.is_domain_valid(self.domain_file):
