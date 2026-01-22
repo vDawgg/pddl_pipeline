@@ -19,6 +19,7 @@ class PipelineError(StrEnum):
 
 @dataclass
 class PipelineResult:
+    model: str
     elapsed_time: float = 0.0
     num_model_calls: int = 0
     error: PipelineError | None = None

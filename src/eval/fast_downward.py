@@ -5,15 +5,12 @@ https://github.com/aibasel/lab/tree/main/downward/parsers
 
 import logging
 import re
-import shutil
 from enum import StrEnum, auto
 from pathlib import Path
 from subprocess import run
 from tempfile import NamedTemporaryFile
 
 from src.base.schema import PDDLFiles, PipelineError
-from src.constants import plans_dir
-from src.utils.timestamp import get_current_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -93,19 +90,6 @@ def detect_file_type(output: str) -> PDDLFiles | None:
         elif stripped == "Parsing task" or stripped.startswith("Parsing task"):
             last_file_type = PDDLFiles.PROBLEM
     return last_file_type
-
-
-def save_plan(plan_file: Path, name: str) -> Path:
-    latest_plan = ""
-    for i in range(1, 100):
-        candidate_path = Path(f"{plan_file}.{i}")
-        if candidate_path.is_file():
-            latest_plan = candidate_path
-        else:
-            break
-    plan_name = plans_dir / f"{name}_{get_current_timestamp()}.plan"
-    shutil.copyfile(latest_plan, plan_name)
-    return plan_name
 
 
 class FDErrorInfo:
@@ -309,45 +293,3 @@ def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
         fd_code,
         "Fast Downward encountered an error while trying to generate a plan.",
     )
-
-
-# TODO: Think about changing this to 'can_generate_plan' and generate_plan
-#       This way we would have error info and the actual planning separated
-#       Still, we cannot assume that we will allways just get perfect plans here.
-#       We should also expect that the translation will not always be fixed when
-#       this method is getting called.
-def generate_plan(
-    domain_file: Path,
-    problem_file: Path,
-    name: str,
-) -> FDErrorInfo | Path:
-    plan_file = NamedTemporaryFile(delete=False)
-    process = run(
-        [
-            "python",
-            "../fast-downward-24.06.1/fast-downward.py",
-            "--overall-time-limit",
-            "1m",
-            "--plan-file",
-            plan_file.name,
-            "--alias",
-            "seq-sat-lama-2011",
-            domain_file,
-            problem_file,
-        ],
-        capture_output=True,
-        text=True,
-    )
-    fd_code = exit_codes[process.returncode]
-    # TODO: In addition to the error parsing here, we should also include parsing for the planning statistics.
-    #       i.e. how long did the planning take, how many steps etc. if this is a sensible comparison
-    #       -> This is likely not going to make a big difference and should be kept for very late down the line
-    if (
-        fd_code == ExitCodes.SUCCESS
-        or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY
-        or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_TIME
-        or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY_AND_TIME
-    ):
-        return save_plan(Path(plan_file.name), name)
-    else:
-        return parse_error(fd_code, process.stdout)

@@ -2,18 +2,25 @@ from src.base.schema import PDDLFiles
 from src.eval.fast_downward import (
     ExitCodes,
     FDErrorInfo,
-    generate_plan,
 )
+from src.inference import Models
+from src.pipeline import Baseline
+from src.utils.domains import Domains
 from tests.constants import eval_resource_dir
 
 
 class TestFastDownward:
+    def setup_method(self):
+        self.pipeline = Baseline(
+            model=Models.GEMMA_3_12B,
+            domain=Domains.RING_AND_PEG,
+        )
+
     def test_translate_error_expected(self):
         pddl_dir = eval_resource_dir / "test_translate_error_expected"
-        error_info = generate_plan(
+        error_info = self.pipeline._generate_plan(
             pddl_dir / "domain.pddl",
             pddl_dir / "problem.pddl",
-            "test",
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
@@ -25,10 +32,9 @@ class TestFastDownward:
 
     def test_translate_error_incorrect_domain_start(self):
         pddl_dir = eval_resource_dir / "test_translate_error_incorrect_domain_start"
-        error_info = generate_plan(
+        error_info = self.pipeline._generate_plan(
             pddl_dir / "domain.pddl",
             pddl_dir / "problem.pddl",
-            "test",
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
@@ -40,10 +46,9 @@ class TestFastDownward:
 
     def test_search_unsolved(self):
         pddl_dir = eval_resource_dir / "test_search_unsolved"
-        error_info = generate_plan(
+        error_info = self.pipeline._generate_plan(
             pddl_dir / "domain.pddl",
             pddl_dir / "problem.pddl",
-            "test",
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.SEARCH_UNSOLVED_INCOMPLETE

@@ -1,14 +1,20 @@
 import logging
+import shutil
 import time
 from abc import ABC, abstractmethod
-from enum import StrEnum, auto
+from enum import Enum, StrEnum, auto
 from pathlib import Path
+from subprocess import run
+from tempfile import NamedTemporaryFile
 from typing import TypeVar
 
+import polars as pl
 from pydantic import BaseModel
+from tqdm import tqdm
 
-from src.base.schema import PipelineError, PipelineResult
-from src.constants import logs_dir
+from src.base.schema import PDDLFiles, PipelineError, PipelineResult
+from src.constants import generated_pddl_dir, logs_dir, plans_dir, results_dir
+from src.eval.fast_downward import ExitCodes, FDErrorInfo, exit_codes, parse_error
 from src.inference import Models
 from src.utils.domains import Domains
 from src.utils.logger import add_file_handler, remove_file_handler
@@ -54,7 +60,8 @@ class PipelineBase(ABC):
         self,
         error: PipelineError | None = None,
     ) -> PipelineResult:
-        res = PipelineResult(
+        return PipelineResult(
+            model=self.model,
             elapsed_time=self.elapsed_time,
             num_model_calls=self.num_model_calls,
             error=error,
@@ -71,8 +78,6 @@ class PipelineBase(ABC):
             generate_plan_calls=self.generate_plan_calls,
         )
 
-        return res
-
     def run(self) -> PipelineResult:
         self.num_model_calls = 0
         self.create_pddl_file_calls = 0
@@ -84,7 +89,10 @@ class PipelineBase(ABC):
         self.domain_file = None
         self.problem_file = None
         self.plan_file = None
-        self.log_file = logs_dir / f"{self.name}_{get_current_timestamp()}.log"
+        self.log_file = (
+            logs_dir
+            / f"{self.domain}_{self.name}_{self.model}_{get_current_timestamp()}.log"
+        )
         file_handler = add_file_handler(self.log_file)
         start = time.perf_counter()
         try:
@@ -103,3 +111,92 @@ class PipelineBase(ABC):
     @abstractmethod
     def _run_impl(self) -> PipelineResult:
         pass
+
+    def run_eval(self, iterations: int) -> Path:
+        results: list[PipelineResult] = []
+        for _ in tqdm(range(iterations), "Running Evaluation"):
+            results.append(self.run())
+        results_name = (
+            results_dir
+            / f"{self.domain}_{self.name}_{self.model}_{get_current_timestamp()}.csv"
+        )
+
+        def serialize_value(v):
+            if isinstance(v, Enum):
+                return v.value
+            if isinstance(v, Path):
+                return str(v)
+            return v
+
+        pl.DataFrame(
+            {k: serialize_value(v) for k, v in result.__dict__.items()}
+            for result in results
+        ).write_csv(results_name)
+        return results_name
+
+    def _save_plan(self, plan_file: Path) -> Path:
+        latest_plan = ""
+        for i in range(1, 100):
+            candidate_path = Path(f"{plan_file}.{i}")
+            if candidate_path.is_file():
+                latest_plan = candidate_path
+            else:
+                break
+        plan_name = (
+            plans_dir
+            / f"{self.domain}_{self.name}_{self.model}_{get_current_timestamp()}.plan"
+        )
+        shutil.copyfile(latest_plan, plan_name)
+        return plan_name
+
+    def _generate_plan(
+        self,
+        domain_file: Path,
+        problem_file: Path,
+    ) -> FDErrorInfo | Path:
+        plan_file = NamedTemporaryFile(delete=False)
+        process = run(
+            [
+                "python",
+                "../fast-downward-24.06.1/fast-downward.py",
+                "--overall-time-limit",
+                "1m",
+                "--plan-file",
+                plan_file.name,
+                "--alias",
+                "seq-sat-lama-2011",
+                domain_file,
+                problem_file,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        fd_code = exit_codes[process.returncode]
+        if (
+            fd_code == ExitCodes.SUCCESS
+            or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY
+            or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_TIME
+            or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY_AND_TIME
+        ):
+            return self._save_plan(Path(plan_file.name))
+        else:
+            return parse_error(fd_code, process.stdout)
+
+    def _write_pddl_file(
+        self,
+        pddl: str,
+        file: Path | None = None,
+        pddl_file_type: PDDLFiles | None = None,
+    ) -> Path:
+        file_path = (
+            file
+            or generated_pddl_dir
+            / f"{self.domain}_{pddl_file_type}_{self.name}_{self.model}_{get_current_timestamp()}.pddl"
+        )
+        with open(file_path, "w") as f:
+            f.write(pddl)
+        return file_path
+
+    def _read_pddl_file(self, pddl_file: Path) -> str:
+        with open(pddl_file) as f:
+            return f.read()

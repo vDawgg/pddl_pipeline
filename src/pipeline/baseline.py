@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from src.base.pipeline import PipelineBase, Pipelines
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
 from src.constants import project_root
-from src.eval.fast_downward import FDErrorInfo, generate_plan
+from src.eval.fast_downward import FDErrorInfo
 from src.eval.val import get_syntax_mistakes_domain, get_syntax_mistakes_problem
 from src.inference import Models, provider_hosts, provider_keys
 from src.inference.model_comm import (
@@ -17,7 +17,6 @@ from src.inference.model_comm import (
     make_user_message_with_image,
 )
 from src.utils.domains import Domains
-from src.utils.io import write_pddl_file
 from src.utils.prompts import domain_pompts, problem_prompts
 
 logger = logging.getLogger(__name__)
@@ -103,8 +102,8 @@ class Baseline(PipelineBase):
         domain, messages = self.make_request(
             domain_pompts[self.domain],
         )
-        self.domain_file = write_pddl_file(
-            domain, name=self.name, pddl_file_type=PDDLFiles.DOMAIN
+        self.domain_file = self._write_pddl_file(
+            domain, pddl_file_type=PDDLFiles.DOMAIN
         )
         if not self.is_domain_valid(self.domain_file):
             return self.create_result(error=PipelineError.DOMAIN_FAILURE)
@@ -113,13 +112,13 @@ class Baseline(PipelineBase):
             problem_prompts[self.domain],
             messages=[*messages, make_assistant_message(domain)],
         )
-        self.problem_file = write_pddl_file(
-            problem, name=self.name, pddl_file_type=PDDLFiles.PROBLEM
+        self.problem_file = self._write_pddl_file(
+            problem, pddl_file_type=PDDLFiles.PROBLEM
         )
         if not self.is_problem_valid(self.domain_file, self.problem_file):
             return self.create_result(error=PipelineError.PROBLEM_FAILURE)
 
-        planner_output = generate_plan(self.domain_file, self.problem_file, self.name)
+        planner_output = self._generate_plan(self.domain_file, self.problem_file)
         if isinstance(planner_output, FDErrorInfo):
             logger.debug("Failed to generate a plan")
             return self.create_result(error=planner_output.to_pipeline_error())

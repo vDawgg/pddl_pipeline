@@ -1,7 +1,7 @@
 import logging
 
 from src.base.schema import PipelineError, PipelineResult
-from src.eval.fast_downward import FDErrorInfo, generate_plan
+from src.eval.fast_downward import FDErrorInfo
 from src.pipeline.tool_calls import ToolCallPipeline
 from src.utils.prompts import Prompts, get_prompt
 
@@ -66,7 +66,7 @@ class ToolCallPipelineMutltiAgent(ToolCallPipeline):
                 self.generate_plan,
             ],
         )
-        plan = generate_plan(self.domain_file, self.problem_file, self.name)
+        plan = self._generate_plan(self.domain_file, self.problem_file)
         if isinstance(plan, FDErrorInfo):
             logger.debug(
                 f"# Failed to generate solvable domain and problem: {plan.error_message}"

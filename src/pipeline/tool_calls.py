@@ -1,16 +1,12 @@
 import logging
 from collections.abc import Callable
-from enum import Enum
 from pathlib import Path
 
 import openai
-import polars as pl
-from tqdm import tqdm
 
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
-from src.constants import project_root, results_dir
+from src.constants import project_root
 from src.eval.fast_downward import FDErrorInfo
-from src.eval.fast_downward import generate_plan as _generate_plan
 from src.eval.fast_downward import translate_pddl as _translate_pddl
 from src.eval.val import get_syntax_mistakes_domain as _get_syntax_mistakes_domain
 from src.eval.val import get_syntax_mistakes_problem as _get_syntax_mistakes_problem
@@ -22,9 +18,7 @@ from src.inference.model_comm import (
     parse_react_message,
 )
 from src.pipeline.val_and_planner_feedback import ValAndPlannerFeedbackPipeline
-from src.utils.io import write_pddl_file
 from src.utils.prompts import Prompts, add_line_numbers, get_prompt
-from src.utils.timestamp import get_current_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +42,10 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :rtype: str
         """
         self.create_pddl_file_calls += 1
-        # TODO: We want to execute this branch when the file we want to edit has not been created yet
         if (self.domain_file is None and pddl_file_type == PDDLFiles.DOMAIN) or (
             self.problem_file is None and pddl_file_type == PDDLFiles.PROBLEM
         ):
-            file_path = write_pddl_file(
-                content, name=self.name, pddl_file_type=pddl_file_type
-            )
+            file_path = self._write_pddl_file(content, pddl_file_type=pddl_file_type)
             if pddl_file_type == PDDLFiles.DOMAIN:
                 self.domain_file = file_path
             elif pddl_file_type == PDDLFiles.PROBLEM:
@@ -118,6 +109,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
             f.write("".join(lines))
             content = "".join(add_line_numbers(lines))
             response = f"**Edit successfully applied.**\n\n## Updated file contents:\n\n```pddl\n{content}\n```"
+            # FIXME: This never seems to trigger and needs to be tested.
             syntax_errors = ""
             if "domain" in file:
                 err_info = _get_syntax_mistakes_domain(Path(file))
@@ -206,7 +198,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :rtype: str
         """
         self.generate_plan_calls += 1
-        plan_output = _generate_plan(Path(domain_file), Path(problem_file), self.name)
+        plan_output = self._generate_plan(Path(domain_file), Path(problem_file))
         if isinstance(plan_output, FDErrorInfo):
             return "Fast Downward was unable to generate a plan" + plan_output.to_str()
         return f"Fast Downward successfully generated a plan under {plan_output}"
@@ -280,6 +272,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
             parsed_responses.append(parsed_response)
             if parsed_response.tool_name == "finish":
                 break
+            # FIXME: This still happens quite often and does not trigger. Needs to be tested.
             if (
                 parsed_response.tool_name == past_tool_name
                 and parsed_response.tool_args == past_tool_args
@@ -308,25 +301,6 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         assert res is not None
         return res.strip()
 
-    def run_eval(self, iterations: int) -> Path:
-        results: list[PipelineResult] = []
-        for _ in tqdm(range(iterations), "Running Evaluation"):
-            results.append(self.run())
-        results_name = results_dir / f"{self.name}_{get_current_timestamp()}.csv"
-
-        def serialize_value(v):
-            if isinstance(v, Enum):
-                return v.value
-            if isinstance(v, Path):
-                return str(v)
-            return v
-
-        pl.DataFrame(
-            {k: serialize_value(v) for k, v in result.__dict__.items()}
-            for result in results
-        ).write_csv(results_name)
-        return results_name
-
     def _run_impl(self) -> PipelineResult:
         self.make_react_workflow(
             input_prompt=get_prompt(
@@ -352,7 +326,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         ):
             error = PipelineError.PROBLEM_FAILURE
         else:
-            plan = _generate_plan(self.domain_file, self.problem_file, self.name)
+            plan = self._generate_plan(self.domain_file, self.problem_file)
             if isinstance(plan, FDErrorInfo):
                 logger.debug(
                     f"# Failed to generate solvable domain and problem: {plan.error_message}"

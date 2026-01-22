@@ -3,12 +3,11 @@ from pathlib import Path
 
 from src.base.pipeline import Pipelines
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
-from src.eval.fast_downward import ExitCodes, FDErrorInfo, generate_plan
+from src.eval.fast_downward import ExitCodes, FDErrorInfo
 from src.inference import Models
 from src.inference.model_comm import make_assistant_message
 from src.pipeline.val_feedback import ValFeedbackPipeline
 from src.utils.domains import Domains
-from src.utils.io import read_pddl_file, write_pddl_file
 from src.utils.prompts import Prompts, domain_pompts, get_prompt, problem_prompts
 
 logger = logging.getLogger(__name__)
@@ -24,22 +23,22 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
         unformatted_prompt = get_prompt(Prompts.PLANNER_CONTEXT, Prompts.PLANNER_TASK)
         prompt = unformatted_prompt.format(
             file=PDDLFiles.DOMAIN,
-            domain=read_pddl_file(domain_file),
-            problem=read_pddl_file(problem_file),
+            domain=self._read_pddl_file(domain_file),
+            problem=self._read_pddl_file(problem_file),
         )
         domain, _ = self.make_request(
             prompt,
         )
         prompt = unformatted_prompt.format(
             file=PDDLFiles.PROBLEM,
-            domain=read_pddl_file(domain_file),
-            problem=read_pddl_file(problem_file),
+            domain=self._read_pddl_file(domain_file),
+            problem=self._read_pddl_file(problem_file),
         )
         problem, _ = self.make_request(
             prompt,
         )
-        domain_file = write_pddl_file(domain, domain_file)
-        problem_file = write_pddl_file(problem, problem_file)
+        domain_file = self._write_pddl_file(domain, domain_file)
+        problem_file = self._write_pddl_file(problem, problem_file)
         return
 
     def fix_parsing_error(
@@ -49,9 +48,9 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
             Prompts.PLANNER_TRANSLATE_CONTEXT, Prompts.PLANNER_TRANSLATE_TASK
         )
         if planner_output.file == PDDLFiles.DOMAIN:
-            content = read_pddl_file(domain_file)
+            content = self._read_pddl_file(domain_file)
         else:
-            content = read_pddl_file(problem_file)
+            content = self._read_pddl_file(problem_file)
         prompt = unformatted_prompt.format(
             file=planner_output.file,
             err_msg=planner_output.error_message,
@@ -61,9 +60,9 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
             prompt,
         )
         if planner_output.file == PDDLFiles.DOMAIN:
-            write_pddl_file(output, file=domain_file)
+            self._write_pddl_file(output, file=domain_file)
         else:
-            write_pddl_file(output, file=problem_file)
+            self._write_pddl_file(output, file=problem_file)
         return
 
     def fix_planning(
@@ -76,7 +75,7 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
         iterations = 0
         planner_output = None
         for i in range(num_tries):
-            planner_output = generate_plan(domain_file, problem_file, self.name)
+            planner_output = self._generate_plan(domain_file, problem_file)
             self.generate_plan_calls += 1
             if type(planner_output) is str:
                 break
@@ -100,8 +99,8 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
         domain, messages = self.make_request(
             domain_pompts[self.domain],
         )
-        self.domain_file = write_pddl_file(
-            domain, name=self.name, pddl_file_type=PDDLFiles.DOMAIN
+        self.domain_file = self._write_pddl_file(
+            domain, pddl_file_type=PDDLFiles.DOMAIN
         )
         self.fix_domain(self.domain_file)
         if not self.is_domain_valid(self.domain_file):
@@ -113,8 +112,8 @@ class ValAndPlannerFeedbackPipeline(ValFeedbackPipeline):
             problem_prompts[self.domain],
             messages=[*messages, make_assistant_message(domain)],
         )
-        self.problem_file = write_pddl_file(
-            problem, name=self.name, pddl_file_type=PDDLFiles.PROBLEM
+        self.problem_file = self._write_pddl_file(
+            problem, pddl_file_type=PDDLFiles.PROBLEM
         )
         self.fix_problem(self.domain_file, self.problem_file)
         if not self.is_problem_valid(self.domain_file, self.problem_file):
