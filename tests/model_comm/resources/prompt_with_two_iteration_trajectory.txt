@@ -1,6 +1,10 @@
 Some prompt for the model to follow
 
 
+Path to domain file: Not yet created
+
+Path to problem file: Not yet created
+
 [[ -- trajectory -- ]]
 [[ -- thought_0 -- ]]
 First thought

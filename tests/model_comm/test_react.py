@@ -49,6 +49,34 @@ class TestReact:
             ]
             results = ["result_one", "result_two"]
             prompt_with_trajectory = make_prompt_with_trajectory(
-                input_prompt, parsed_responses, results
+                input_prompt, parsed_responses, results, 3
+            ).strip()
+            assert prompt_with_trajectory == f.read().strip()
+
+    def test_make_prompt_with_trajectory_max_past_steps(self):
+        with open(
+            model_comm_resource_dir / "prompt_with_two_iteration_trajectory.txt"
+        ) as f:
+            input_prompt = "Some prompt for the model to follow\n"
+            parsed_responses = [
+                ReactResponse(
+                    thought="Past thought",
+                    tool_name="past_tool",
+                    tool_args={"past_arg": 0},
+                ),
+                ReactResponse(
+                    thought="First thought",
+                    tool_name="first_tool",
+                    tool_args={"first_arg": 1},
+                ),
+                ReactResponse(
+                    thought="Second thought",
+                    tool_name="second_tool",
+                    tool_args={"second_arg": 2},
+                ),
+            ]
+            results = ["result_one", "result_two"]
+            prompt_with_trajectory = make_prompt_with_trajectory(
+                input_prompt, parsed_responses, results, 2
             ).strip()
             assert prompt_with_trajectory == f.read().strip()

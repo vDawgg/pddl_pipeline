@@ -5,21 +5,16 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from types import UnionType
 from typing import (
     Any,
-    TypeVar,
     Union,
     get_args,
     get_origin,
     get_type_hints,
 )
 
-import openai
-from pydantic import BaseModel
-
-from src.constants import project_root
-from src.inference import Models, provider_hosts, provider_keys
 from src.utils.prompts import Prompts, get_prompt
 
 logger = logging.getLogger(__name__)
@@ -211,15 +206,26 @@ def parse_react_message(response: str) -> ReactResponse | None:
     return None
 
 
-# TODO: Think of a cleaner way to structure the results here.
 def make_prompt_with_trajectory(
-    input_prompt: str, parsed_responses: list[ReactResponse], results: list[str]
+    input_prompt: str,
+    parsed_responses: list[ReactResponse],
+    results: list[str],
+    max_past_steps: int,
+    domain_file_path: Path | None = None,
+    problem_file_path: Path | None = None,
 ) -> str:
     if len(parsed_responses) > 0:
+        if len(parsed_responses) > max_past_steps:
+            parsed_responses_working_copy = parsed_responses[-max_past_steps:]
+            results_working_copy = results[-max_past_steps:]
+        else:
+            parsed_responses_working_copy = parsed_responses
+            results_working_copy = results
         unformatted_trajectory = get_prompt(Prompts.TRAJECTORY)
         trajectory = ""
-        for i in range(len(parsed_responses)):
-            parsed_response = parsed_responses[i]
+        assert len(results_working_copy) == len(parsed_responses_working_copy)
+        for i in range(len(parsed_responses_working_copy)):
+            parsed_response = parsed_responses_working_copy[i]
             unformatted_iteration = get_prompt(Prompts.ITERATION)
             trajectory += (
                 unformatted_iteration.format(
@@ -227,137 +233,14 @@ def make_prompt_with_trajectory(
                     thought=parsed_response.thought,
                     tool_name=parsed_response.tool_name,
                     tool_args=parsed_response.tool_args,
-                    tool_result=results[i],
+                    tool_result=results_working_copy[i],
                 )
                 + "\n"
             )
         return unformatted_trajectory.format(
-            input_prompt=input_prompt, trajectory=trajectory
+            domain_file_path=domain_file_path or "Not yet created",
+            problem_file_path=problem_file_path or "Not yet created",
+            input_prompt=input_prompt,
+            trajectory=trajectory,
         )
     return input_prompt
-
-
-T = TypeVar("T", bound=BaseModel)
-
-
-def make_request[T](
-    input_prompt: str,
-    model_name: Models,
-    messages: list[Any] | None = None,
-    format: type[T] | None = None,
-    imgs: list[str] | None = None,
-) -> tuple[T | str, list[Any]]:
-    messages = messages or []
-
-    logger.debug("# User Message")
-    logger.debug(input_prompt)
-
-    key_path = project_root / provider_keys[model_name]
-    if not key_path.exists():
-        raise FileNotFoundError(f"API key file not found: {key_path}")
-
-    client = openai.OpenAI(
-        base_url=provider_hosts[model_name],
-        api_key=open(str(key_path)).readline().strip(),
-    )
-
-    if imgs:
-        messages.append(make_user_message_with_image(input_prompt, imgs))
-    else:
-        messages.append(make_user_message(input_prompt))
-
-    if format:
-        response = client.beta.chat.completions.parse(
-            model=model_name,
-            messages=messages,
-            response_format=format,
-        )
-        res = response.choices[0].message.parsed
-        assert res
-        return res, messages
-    else:
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-        )
-        res = response.choices[0].message.content
-        logger.debug("# Assistant Message")
-        logger.debug(res)
-        assert res is not None
-        res = res.removeprefix("```pddl")
-        res = res.removesuffix("```")
-        return res.strip(), messages
-
-
-# TODO: Try with native openai tool-calling as well
-#       -> This structure seems to be supported by most of the newer models.
-# TODO: Experiment with the size of the context trajectory
-def make_react_workflow(
-    model_name: str,
-    input_prompt: str,
-    tools: list[Callable],
-    max_iters=10,
-) -> tuple[str, int]:
-    tools_json = [make_tool(t) for t in tools]
-    tools_dict = {t.__name__: t for t in tools}
-
-    unformatted_base_prompt = get_prompt(Prompts.REACT_BASE)
-    base_prompt = unformatted_base_prompt.format(tools=tools_json)
-    input_prompt = base_prompt + input_prompt
-
-    key_path = project_root / provider_keys[model_name]
-    if not key_path.exists():
-        raise FileNotFoundError(f"API key file not found: {key_path}")
-    client = openai.OpenAI(
-        base_url=provider_hosts[model_name],
-        api_key=open(str(key_path)).readline().strip(),
-    )
-
-    res = None
-    parsed_responses = []
-    tool_results = []
-    num_model_calls = 0
-    for _ in range(max_iters):
-        prompt_with_trajectory = make_prompt_with_trajectory(
-            input_prompt, parsed_responses, tool_results
-        )
-        logger.debug(f"# Prompts with trajectory:\n{prompt_with_trajectory}")
-        res = (
-            client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    make_user_message(prompt_with_trajectory)  # type: ignore
-                ],
-            )
-            .choices[0]
-            .message.content
-        )
-        num_model_calls += 1
-        assert res is not None
-        logger.debug("# Assistant Message")
-        logger.debug(res)
-
-        parsed_response = parse_react_message(res)
-        if parsed_response is None:
-            logger.debug("Assistant answered with malformed response")
-            # TODO: Think about what we actually want to do here
-            # TODO: We should also log these as results
-            continue
-
-        parsed_responses.append(parsed_response)
-        if parsed_response.tool_name == "finish":
-            break
-        try:
-            tool_results.append(
-                tools_dict[parsed_response.tool_name](**parsed_response.tool_args)
-            )
-        except Exception:
-            logger.debug("Assistant answered with unusable tool-call")
-            parsed_responses.pop()
-            continue
-        logger.debug("# Tool Call")
-        logger.debug(f"## Tool: {parsed_response.tool_name}")
-        logger.debug(f"## Tool args: {parsed_response.tool_args}")
-        logger.debug(f"## Tool result: {tool_results[-1]}")
-    assert res is not None
-    return res.strip(), num_model_calls

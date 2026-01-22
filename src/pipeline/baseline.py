@@ -1,12 +1,21 @@
 import logging
 from pathlib import Path
+from typing import Any, TypeVar
+
+import openai
+from pydantic import BaseModel
 
 from src.base.pipeline import PipelineBase, Pipelines
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
+from src.constants import project_root
 from src.eval.fast_downward import FDErrorInfo, generate_plan
 from src.eval.val import get_syntax_mistakes_domain, get_syntax_mistakes_problem
-from src.inference import Models
-from src.inference.model_comm import make_assistant_message
+from src.inference import Models, provider_hosts, provider_keys
+from src.inference.model_comm import (
+    make_assistant_message,
+    make_user_message,
+    make_user_message_with_image,
+)
 from src.utils.domains import Domains
 from src.utils.io import write_pddl_file
 from src.utils.prompts import domain_pompts, problem_prompts
@@ -39,6 +48,56 @@ class Baseline(PipelineBase):
             return False
         logger.debug("Generated syntactically valid problem")
         return True
+
+    T = TypeVar("T", bound=BaseModel)
+
+    def make_request[T](
+        self,
+        input_prompt: str,
+        messages: list[Any] | None = None,
+        format: type[T] | None = None,
+        imgs: list[str] | None = None,
+    ) -> tuple[T | str, list[Any]]:
+        messages = messages or []
+
+        logger.debug("# User Message")
+        logger.debug(input_prompt)
+
+        key_path = project_root / provider_keys[self.model]
+        if not key_path.exists():
+            raise FileNotFoundError(f"API key file not found: {key_path}")
+
+        client = openai.OpenAI(
+            base_url=provider_hosts[self.model],
+            api_key=open(str(key_path)).readline().strip(),
+        )
+
+        if imgs:
+            messages.append(make_user_message_with_image(input_prompt, imgs))
+        else:
+            messages.append(make_user_message(input_prompt))
+
+        if format:
+            response = client.beta.chat.completions.parse(
+                model=self.model,
+                messages=messages,
+                response_format=format,
+            )
+            res = response.choices[0].message.parsed
+            assert res
+            return res, messages
+        else:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+            )
+            res = response.choices[0].message.content
+            logger.debug("# Assistant Message")
+            logger.debug(res)
+            assert res is not None
+            res = res.removeprefix("```pddl")
+            res = res.removesuffix("```")
+            return res.strip(), messages
 
     def _run_impl(self) -> PipelineResult:
         domain, messages = self.make_request(

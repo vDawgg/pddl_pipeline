@@ -31,4 +31,5 @@ class PipelineResult:
     edit_lines_calls: int = 0
     domain_syntax_errors_calls: int = 0
     problem_syntax_mistakes_calls: int = 0
+    translate_pddl_calls: int = 0
     generate_plan_calls: int = 0

@@ -1,24 +1,15 @@
 import logging
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from enum import Enum, StrEnum, auto
+from enum import StrEnum, auto
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import TypeVar
 
-import polars as pl
 from pydantic import BaseModel
-from tqdm import tqdm
 
 from src.base.schema import PipelineError, PipelineResult
-from src.constants import logs_dir, results_dir
+from src.constants import logs_dir
 from src.inference import Models
-from src.inference.model_comm import (
-    make_react_workflow as _make_react_workflow,
-)
-from src.inference.model_comm import (
-    make_request as _make_request,
-)
 from src.utils.domains import Domains
 from src.utils.logger import add_file_handler, remove_file_handler
 from src.utils.timestamp import get_current_timestamp
@@ -52,6 +43,7 @@ class PipelineBase(ABC):
         self.edit_lines_calls = 0
         self.domain_syntax_errors_calls = 0
         self.problem_syntax_mistakes_calls = 0
+        self.translate_pddl_calls = 0
         self.generate_plan_calls = 0
         self.domain_file: Path | None = None
         self.problem_file: Path | None = None
@@ -75,6 +67,7 @@ class PipelineBase(ABC):
             edit_lines_calls=self.edit_lines_calls,
             domain_syntax_errors_calls=self.domain_syntax_errors_calls,
             problem_syntax_mistakes_calls=self.problem_syntax_mistakes_calls,
+            translate_pddl_calls=self.translate_pddl_calls,
             generate_plan_calls=self.generate_plan_calls,
         )
 
@@ -110,53 +103,3 @@ class PipelineBase(ABC):
     @abstractmethod
     def _run_impl(self) -> PipelineResult:
         pass
-
-    def make_request(
-        self,
-        input_prompt: str,
-        messages: list[Any] | None = None,
-        format: type[T] | None = None,
-        imgs: list[str] | None = None,
-    ) -> tuple[T | str, list[Any]]:
-        self.num_model_calls += 1
-        return _make_request(
-            input_prompt,
-            model_name=self.model,
-            messages=messages,
-            format=format,
-            imgs=imgs,
-        )
-
-    def make_react_workflow(
-        self,
-        input_prompt: str,
-        tools: list[Callable],
-        max_iters: int = 10,
-    ) -> str:
-        result, num_calls = _make_react_workflow(
-            model_name=self.model,
-            input_prompt=input_prompt,
-            tools=tools,
-            max_iters=max_iters,
-        )
-        self.num_model_calls += num_calls
-        return result
-
-    def run_eval(self, iterations: int) -> Path:
-        results: list[PipelineResult] = []
-        for _ in tqdm(range(iterations), "Running Evaluation"):
-            results.append(self.run())
-        results_name = results_dir / f"{self.name}_{get_current_timestamp()}.csv"
-
-        def serialize_value(v):
-            if isinstance(v, Enum):
-                return v.value
-            if isinstance(v, Path):
-                return str(v)
-            return v
-
-        pl.DataFrame(
-            {k: serialize_value(v) for k, v in result.__dict__.items()}
-            for result in results
-        ).write_csv(results_name)
-        return results_name

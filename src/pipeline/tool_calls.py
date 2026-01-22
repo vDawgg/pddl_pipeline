@@ -1,14 +1,30 @@
 import logging
+from collections.abc import Callable
+from enum import Enum
 from pathlib import Path
 
+import openai
+import polars as pl
+from tqdm import tqdm
+
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
+from src.constants import project_root, results_dir
 from src.eval.fast_downward import FDErrorInfo
 from src.eval.fast_downward import generate_plan as _generate_plan
+from src.eval.fast_downward import translate_pddl as _translate_pddl
 from src.eval.val import get_syntax_mistakes_domain as _get_syntax_mistakes_domain
 from src.eval.val import get_syntax_mistakes_problem as _get_syntax_mistakes_problem
+from src.inference import provider_hosts, provider_keys
+from src.inference.model_comm import (
+    make_prompt_with_trajectory,
+    make_tool,
+    make_user_message,
+    parse_react_message,
+)
 from src.pipeline.val_and_planner_feedback import ValAndPlannerFeedbackPipeline
 from src.utils.io import write_pddl_file
-from src.utils.prompts import Prompts, get_prompt
+from src.utils.prompts import Prompts, add_line_numbers, get_prompt
+from src.utils.timestamp import get_current_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +48,30 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :rtype: str
         """
         self.create_pddl_file_calls += 1
-        file_path = write_pddl_file(
-            content, name=self.name, pddl_file_type=pddl_file_type
+        # TODO: We want to execute this branch when the file we want to edit has not been created yet
+        if (self.domain_file is None and pddl_file_type == PDDLFiles.DOMAIN) or (
+            self.problem_file is None and pddl_file_type == PDDLFiles.PROBLEM
+        ):
+            file_path = write_pddl_file(
+                content, name=self.name, pddl_file_type=pddl_file_type
+            )
+            if pddl_file_type == PDDLFiles.DOMAIN:
+                self.domain_file = file_path
+            elif pddl_file_type == PDDLFiles.PROBLEM:
+                self.problem_file = file_path
+            return file_path._str
+        # Already created a file. Preferring to use same file name to avoid model confusing
+        # different versions of domain/problem file.
+        assert self.domain_file is not None
+        assert self.problem_file is not None
+        file_path = (
+            self.domain_file
+            if pddl_file_type == PDDLFiles.DOMAIN
+            else self.problem_file
         )
-        if pddl_file_type == PDDLFiles.DOMAIN:
-            self.domain_file = file_path
-        elif pddl_file_type == PDDLFiles.PROBLEM:
-            self.problem_file = file_path
-        return file_path._str
+        with open(file_path, "w") as f:
+            f.write(content)
+            return file_path._str
 
     # TODO: We might need a file viewer instead
     def read_pddl_file(
@@ -60,28 +92,19 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         with open(file) as f:
             if line_range is not None:
                 start, end = line_range
-                return "".join(f.readlines()[start : end + 1])
-            return f.read()
+                return "".join(add_line_numbers(f.readlines()[start : end + 1]))
+            return "".join(add_line_numbers(f.readlines()))
 
-    # TODO: It might be a good idea to not use line-ranges here and instead work with replacement strings.
-    #       -> Not done by SWE-agent, but aider shows good benchmark resutls. Might be interesting to try.
-    # TODO: Only apply an edit, if the edit did not introduce additional syntax mistakes. For this, we need to keep an index of
-    #       the mistakes currently present in the file.
-    #       -> We still have to think of how we want to answer in cases, where no mistakes are added or mistakes are even fixed.
-    # TODO: Possibly encourage single-line edits by providing an optional 'line' arg to only change one line.
-    #       -> This is already possible with the range, but might not get picked up correctly by the model currently.
-    def edit_lines(
-        self, file: str, line_range: tuple[int, int], replacement: str
-    ) -> str:
+    def edit_lines(self, file: str, line_range: tuple[int, int], new: str) -> str:
         """
         Replace the lines of a file in a given range with the specified replacement string.
 
         :param file: The file to edit the specified lines in.
         :type file: str
-        :param line_range: Lines (from, to). Everything in this range will be deleted and replaced with the string specified in replacement. Note, that lines start from 0.
+        :param line_range: Lines (from, to). Everything in this range will be deleted and replaced with the string specified in replacement. Note, that lines start from 0. Everything before the starting line and after the ending line in the original file will still persist.
         :type line_range: tuple[int, int]
-        :param replacement: The replacement string.
-        :type replacement: str
+        :param new: The new string.
+        :type new: str
         :return: A snippet showing the updated code
         :rtype: str
         """
@@ -89,14 +112,30 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         with open(file, "r+") as f:
             start, end = line_range
             lines = f.readlines()
-            lines[start : end + 1] = [r + "\n" for r in replacement.split("\n")]
+            lines[start : end + 1] = [r + "\n" for r in new.split("\n")]
             f.seek(0)
             f.truncate()
             f.write("".join(lines))
-            start_snippet = start - 4 if (start - 4) > 0 else 0
-            end_snippet = end + 4 if (end + 4) < len(lines) else len(lines)
-            snippet = "".join(lines[start_snippet:end_snippet])
-            return f"Edit successfully applied.\nSnippet containing changes:\n{snippet}"
+            content = "".join(add_line_numbers(lines))
+            response = f"**Edit successfully applied.**\n\n## Updated file contents:\n\n```pddl\n{content}\n```"
+            syntax_errors = ""
+            if "domain" in file:
+                err_info = _get_syntax_mistakes_domain(Path(file))
+                logger.debug(f"Error Info domain after edit: {err_info.errors}")
+                if err_info.num_errors > 0:
+                    syntax_errors = (
+                        "Found syntax errors! Your edit was not applied to the file!\n"
+                        + err_info.get_lines_with_errors()
+                    )
+            else:
+                err_info = _get_syntax_mistakes_problem(Path(self.domain), Path(file))
+                logger.debug(f"Error Info problem after edit: {err_info.errors}")
+                if err_info.num_errors > 0:
+                    syntax_errors = (
+                        "Found syntax errors! Your edit was not applied to the file!\n"
+                        + err_info.get_lines_with_errors()
+                    )
+            return response + syntax_errors
 
     def get_syntax_mistakes_domain(self, domain_file: str) -> str:
         """
@@ -127,11 +166,31 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :return: possible syntax errors found in the problem file
         :rtype: str
         """
+        # FIXME: In some cases this does not return a result (i.e. only an empty string)
         self.problem_syntax_mistakes_calls += 1
         err_info = _get_syntax_mistakes_problem(Path(domain_file), Path(problem_file))
         if err_info.num_errors > 0:
             return err_info.get_lines_with_errors()
         return "No syntax mistakes found in problem file."
+
+    def translate_pddl(self, domain_file: str, problem_file: str) -> str:
+        """
+        Runs the Fast Downward translation layer. This is needed prior to generating a plan.
+        If there are still syntax or semantic mistakes in the given PDDL files, the function
+        return the error information.
+
+        :param domain_file: the path to the domain file
+        :type domain_file: str
+        :param problem_file: the path to the problem file
+        :type problem_file: str
+        :return: Information on the success of the translation
+        :rtype: str
+        """
+        self.translate_pddl_calls += 1
+        translate_output = _translate_pddl(Path(domain_file), Path(problem_file))
+        if translate_output is not None:
+            return "Translation was unsuccessful\n" + translate_output.to_str()
+        return "Fast Downward successfully translated the PDDL files for planning."
 
     def generate_plan(self, domain_file: str, problem_file: str) -> str:
         """
@@ -149,7 +208,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         self.generate_plan_calls += 1
         plan_output = _generate_plan(Path(domain_file), Path(problem_file), self.name)
         if isinstance(plan_output, FDErrorInfo):
-            return plan_output.to_str()
+            return "Fast Downward was unable to generate a plan" + plan_output.to_str()
         return f"Fast Downward successfully generated a plan under {plan_output}"
 
     def finish(self):
@@ -157,6 +216,116 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         Signals that the task is complete (i.e. the desired output has been reached) and no more tools should be called.
         """
         return
+
+    # React Loop
+    def make_react_workflow(
+        self,
+        input_prompt: str,
+        tools: list[Callable],
+        max_iters: int = 10,
+        max_past_setup: int = 3,
+    ) -> str:
+        tools_json = [make_tool(t) for t in tools]
+        tools_dict = {t.__name__: t for t in tools}
+
+        unformatted_base_prompt = get_prompt(Prompts.REACT_BASE)
+        base_prompt = unformatted_base_prompt.format(tools=tools_json)
+        input_prompt = base_prompt + input_prompt
+
+        key_path = project_root / provider_keys[self.model]
+        if not key_path.exists():
+            raise FileNotFoundError(f"API key file not found: {key_path}")
+        client = openai.OpenAI(
+            base_url=provider_hosts[self.model],
+            api_key=open(str(key_path)).readline().strip(),
+        )
+
+        res = None
+        parsed_responses = []
+        tool_results = []
+        past_tool_name = None
+        past_tool_args = None
+        for _ in range(max_iters):
+            prompt_with_trajectory = make_prompt_with_trajectory(
+                input_prompt,
+                parsed_responses,
+                tool_results,
+                domain_file_path=self.domain_file,
+                problem_file_path=self.problem_file,
+                max_past_steps=max_past_setup,
+            )
+            logger.debug(f"# Prompts with trajectory:\n{prompt_with_trajectory}")
+            res = (
+                client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        make_user_message(prompt_with_trajectory)  # type: ignore
+                    ],
+                )
+                .choices[0]
+                .message.content
+            )
+            self.num_model_calls += 1
+            assert res is not None
+            logger.debug("# Assistant Message")
+            logger.debug(res)
+
+            parsed_response = parse_react_message(res)
+            if parsed_response is None:
+                logger.debug("Assistant answered with malformed response")
+                # TODO: Think about what we actually want to do here
+                # TODO: We should also log these as results
+                continue
+
+            parsed_responses.append(parsed_response)
+            if parsed_response.tool_name == "finish":
+                break
+            if (
+                parsed_response.tool_name == past_tool_name
+                and parsed_response.tool_args == past_tool_args
+            ):
+                tool_results.append(
+                    "Tool call is repetition of previous call. Tool was not called. Please do not repeat your actions!"
+                )
+            else:
+                try:
+                    tool_results.append(
+                        tools_dict[parsed_response.tool_name](
+                            **parsed_response.tool_args
+                        )
+                    )
+                except Exception as e:
+                    logger.debug("Assistant answered with unusable tool-call")
+                    logger.debug(f"Error message: {e}")
+                    parsed_responses.pop()
+                    continue
+            logger.debug("# Tool Call")
+            logger.debug(f"## Tool: {parsed_response.tool_name}")
+            logger.debug(f"## Tool args: {parsed_response.tool_args}")
+            logger.debug(f"## Tool result: {tool_results[-1]}")
+            past_tool_name = parsed_response.tool_name
+            past_tool_args = parsed_response.tool_args
+        assert res is not None
+        return res.strip()
+
+    def run_eval(self, iterations: int) -> Path:
+        results: list[PipelineResult] = []
+        for _ in tqdm(range(iterations), "Running Evaluation"):
+            results.append(self.run())
+        results_name = results_dir / f"{self.name}_{get_current_timestamp()}.csv"
+
+        def serialize_value(v):
+            if isinstance(v, Enum):
+                return v.value
+            if isinstance(v, Path):
+                return str(v)
+            return v
+
+        pl.DataFrame(
+            {k: serialize_value(v) for k, v in result.__dict__.items()}
+            for result in results
+        ).write_csv(results_name)
+        return results_name
 
     def _run_impl(self) -> PipelineResult:
         self.make_react_workflow(
@@ -169,6 +338,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
                 self.edit_lines,
                 self.get_syntax_mistakes_domain,
                 self.get_syntax_mistakes_problem,
+                self.translate_pddl,
                 self.generate_plan,
                 self.finish,
             ],

@@ -15,23 +15,32 @@ class TestToolCallPipeline:
         )
 
     def test_read_pddl_file_full_content(self):
-        file_path = pipeline_resource_dir / "sample_domain.pddl"
-        content = self.pipeline.read_pddl_file(str(file_path))
-        with open(file_path) as f:
+        file = pipeline_resource_dir / "sample_domain.pddl"
+        file_with_line_numbers = (
+            pipeline_resource_dir / "sample_domain_line_numbers.pddl"
+        )
+        content = self.pipeline.read_pddl_file(str(file))
+        with open(file_with_line_numbers) as f:
             assert content == f.read()
             assert self.pipeline.read_pddl_file_calls == 1
 
     def test_read_pddl_file_with_line_range(self):
-        file_path = pipeline_resource_dir / "sample_domain.pddl"
-        content = self.pipeline.read_pddl_file(str(file_path), line_range=(0, 2))
-        with open(file_path) as f:
+        file = pipeline_resource_dir / "sample_domain.pddl"
+        file_with_line_numbers = (
+            pipeline_resource_dir / "sample_domain_line_numbers.pddl"
+        )
+        content = self.pipeline.read_pddl_file(str(file), line_range=(0, 2))
+        with open(file_with_line_numbers) as f:
             assert content == "".join(f.readlines()[0:3])
             assert self.pipeline.read_pddl_file_calls == 1
 
     def test_read_pddl_file_single_line(self):
-        file_path = pipeline_resource_dir / "sample_domain.pddl"
-        content = self.pipeline.read_pddl_file(str(file_path), line_range=(0, 0))
-        with open(file_path) as f:
+        file = pipeline_resource_dir / "sample_domain.pddl"
+        file_with_line_numbers = (
+            pipeline_resource_dir / "sample_domain_line_numbers.pddl"
+        )
+        content = self.pipeline.read_pddl_file(str(file), line_range=(0, 0))
+        with open(file_with_line_numbers) as f:
             assert content == f.readlines()[0]
             assert self.pipeline.read_pddl_file_calls == 1
 
@@ -52,7 +61,9 @@ class TestToolCallPipeline:
             tmp_file = Path(tmp_dir) / "test_domain.pddl"
             shutil.copy(src_file, tmp_file)
             self.pipeline.edit_lines(
-                str(tmp_file), line_range=(4, 4), replacement="  (:types block robot)"
+                str(tmp_file),
+                line_range=(4, 4),
+                new="  (:types block robot)\n  (:action dummy)",
             )
             with open(tmp_file) as f:
                 edited_content = f.read()
@@ -71,7 +82,7 @@ class TestToolCallPipeline:
                 """(:predicates\n(on ?b1 ?b2)\n(clear ?b)\n(arm-empty)\n)"""
             )
             self.pipeline.edit_lines(
-                str(tmp_file), line_range=(6, 11), replacement=new_predicates
+                str(tmp_file), line_range=(6, 11), new=new_predicates
             )
             with open(tmp_file) as f:
                 edited_content = f.read()
@@ -88,7 +99,7 @@ class TestToolCallPipeline:
             shutil.copy(src_file, tmp_file)
             expanded_content = """(:types\nblock\nrobot\ntable\n)"""
             self.pipeline.edit_lines(
-                str(tmp_file), line_range=(4, 4), replacement=expanded_content
+                str(tmp_file), line_range=(4, 4), new=expanded_content
             )
             with open(tmp_file) as f:
                 content = f.read()
@@ -103,11 +114,11 @@ class TestToolCallPipeline:
             src_file = pipeline_resource_dir / "sample_domain.pddl"
             tmp_file = Path(tmp_dir) / "test_domain.pddl"
             shutil.copy(src_file, tmp_file)
-            self.pipeline.edit_lines(str(tmp_file), line_range=(0, 0), replacement="")
+            self.pipeline.edit_lines(str(tmp_file), line_range=(0, 0), new="")
             assert self.pipeline.edit_lines_calls == 1
-            self.pipeline.edit_lines(str(tmp_file), line_range=(1, 1), replacement="")
+            self.pipeline.edit_lines(str(tmp_file), line_range=(1, 1), new="")
             assert self.pipeline.edit_lines_calls == 2
-            self.pipeline.edit_lines(str(tmp_file), line_range=(2, 2), replacement="")
+            self.pipeline.edit_lines(str(tmp_file), line_range=(2, 2), new="")
             assert self.pipeline.edit_lines_calls == 3
 
     def test_edit_lines_first_line(self):
@@ -118,7 +129,7 @@ class TestToolCallPipeline:
             self.pipeline.edit_lines(
                 str(tmp_file),
                 line_range=(0, 0),
-                replacement="(define (domain new-blocks)",
+                new="(define (domain new-blocks)",
             )
             with open(tmp_file) as f:
                 content = f.read()

@@ -3,6 +3,7 @@
   (:requirements :strips :typing)
 
   (:types block robot)
+  (:action dummy)
 
   (:predicates
    (on ?b1 ?b2)

@@ -47,3 +47,10 @@ problem_prompts = {
     Domains.BLOCKSWORLD: get_prompt(Prompts.BLOCKSWORLD_PROBLEM),
     Domains.RING_AND_PEG: get_prompt(Prompts.RING_AND_PEG_PROBLEM),
 }
+
+
+def add_line_numbers(lines: list[str]) -> list[str]:
+    lines_with_line_numbers = []
+    for i, line in enumerate(lines):
+        lines_with_line_numbers.append(f"{i}:\t" + line)
+    return lines_with_line_numbers
