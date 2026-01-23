@@ -109,18 +109,6 @@ class TestToolCallPipeline:
                 assert content == f.read()
             assert self.pipeline.edit_lines_calls == 1
 
-    def test_edit_lines_increments_call_counter(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            src_file = pipeline_resource_dir / "sample_domain.pddl"
-            tmp_file = Path(tmp_dir) / "test_domain.pddl"
-            shutil.copy(src_file, tmp_file)
-            self.pipeline.edit_lines(str(tmp_file), line_range=(0, 0), new="")
-            assert self.pipeline.edit_lines_calls == 1
-            self.pipeline.edit_lines(str(tmp_file), line_range=(1, 1), new="")
-            assert self.pipeline.edit_lines_calls == 2
-            self.pipeline.edit_lines(str(tmp_file), line_range=(2, 2), new="")
-            assert self.pipeline.edit_lines_calls == 3
-
     def test_edit_lines_first_line(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             src_file = pipeline_resource_dir / "sample_domain.pddl"
@@ -136,3 +124,47 @@ class TestToolCallPipeline:
             with open(pipeline_resource_dir / "test_edit_lines_first_line.pddl") as f:
                 assert content == f.read()
             assert self.pipeline.edit_lines_calls == 1
+
+    def test_edit_lines_introduce_error_domain(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            src_file = pipeline_resource_dir / "sample_domain.pddl"
+            tmp_file = Path(tmp_dir) / "test_domain.pddl"
+            shutil.copy(src_file, tmp_file)
+            edit_out = self.pipeline.edit_lines(
+                str(tmp_file),
+                line_range=(6, 6),
+                new="(:actions (pick-up",
+            )
+            with open(
+                pipeline_resource_dir / "test_edit_lines_introduce_error_domain.txt"
+            ) as f:
+                assert edit_out == f.read()
+            assert self.pipeline.edit_lines_calls == 1
+
+    def test_edit_lines_introduce_error_problem(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            src_file = pipeline_resource_dir / "sample_problem.pddl"
+            tmp_file = Path(tmp_dir) / "test_problem.pddl"
+            shutil.copy(src_file, tmp_file)
+            edit_out = self.pipeline.edit_lines(
+                str(tmp_file),
+                line_range=(8, 8),
+                new="(:start",
+            )
+            with open(
+                pipeline_resource_dir / "test_edit_lines_introduce_error_problem.txt"
+            ) as f:
+                assert edit_out == f.read()
+            assert self.pipeline.edit_lines_calls == 1
+
+    def test_edit_lines_increments_call_counter(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            src_file = pipeline_resource_dir / "sample_domain.pddl"
+            tmp_file = Path(tmp_dir) / "test_domain.pddl"
+            shutil.copy(src_file, tmp_file)
+            self.pipeline.edit_lines(str(tmp_file), line_range=(0, 0), new="")
+            assert self.pipeline.edit_lines_calls == 1
+            self.pipeline.edit_lines(str(tmp_file), line_range=(1, 1), new="")
+            assert self.pipeline.edit_lines_calls == 2
+            self.pipeline.edit_lines(str(tmp_file), line_range=(2, 2), new="")
+            assert self.pipeline.edit_lines_calls == 3

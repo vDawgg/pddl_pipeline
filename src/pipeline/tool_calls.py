@@ -1,6 +1,8 @@
 import logging
+import shutil
 from collections.abc import Callable
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import openai
 
@@ -99,35 +101,38 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         :return: A snippet showing the updated code
         :rtype: str
         """
+        # We first write the updates to a tempfile and only copy the contents once we know that no
+        # additional syntax mistakes were found by VAL
         self.edit_lines_calls += 1
-        with open(file, "r+") as f:
-            start, end = line_range
-            lines = f.readlines()
-            lines[start : end + 1] = [r + "\n" for r in new.split("\n")]
-            f.seek(0)
-            f.truncate()
-            f.write("".join(lines))
-            content = "".join(add_line_numbers(lines))
-            response = f"**Edit successfully applied.**\n\n## Updated file contents:\n\n```pddl\n{content}\n```"
-            # FIXME: This never seems to trigger and needs to be tested.
-            syntax_errors = ""
-            if "domain" in file:
-                err_info = _get_syntax_mistakes_domain(Path(file))
-                logger.debug(f"Error Info domain after edit: {err_info.errors}")
-                if err_info.num_errors > 0:
-                    syntax_errors = (
-                        "Found syntax errors! Your edit was not applied to the file!\n"
-                        + err_info.get_lines_with_errors()
-                    )
-            else:
-                err_info = _get_syntax_mistakes_problem(Path(self.domain), Path(file))
-                logger.debug(f"Error Info problem after edit: {err_info.errors}")
-                if err_info.num_errors > 0:
-                    syntax_errors = (
-                        "Found syntax errors! Your edit was not applied to the file!\n"
-                        + err_info.get_lines_with_errors()
-                    )
-            return response + syntax_errors
+        start, end = line_range
+        with open(file) as f:
+            file_contents = f.readlines()
+        temp_file = NamedTemporaryFile(delete=False)
+        with open(temp_file.name, "w") as f:
+            file_contents[start : end + 1] = [r + "\n" for r in new.split("\n")]
+            f.write("".join(file_contents))
+        # TODO: Think about providing thw would be content after the change in the message here as well
+        if "domain" in file:
+            err_info = _get_syntax_mistakes_domain(Path(temp_file.name))
+            logger.debug(f"Error Info domain after edit: {err_info.errors}")
+            if err_info.num_errors > 0:
+                return (
+                    "Found syntax errors! Your edit was not applied to the file!\n"
+                    + err_info.get_lines_with_errors()
+                )
+        else:
+            err_info = _get_syntax_mistakes_problem(
+                Path(self.domain), Path(temp_file.name)
+            )
+            logger.debug(f"Error Info problem after edit: {err_info.errors}")
+            if err_info.num_errors > 0:
+                return (
+                    "Found syntax errors! Your edit was not applied to the file!\n"
+                    + f"{err_info.get_lines_with_errors()}\n"
+                )
+        shutil.copy(temp_file.name, file)
+        content = "".join(add_line_numbers(file_contents))
+        return f"**Edit successfully applied.**\n\n## Updated file contents:\n\n```pddl\n{content}\n```"
 
     def get_syntax_mistakes_domain(self, domain_file: str) -> str:
         """
