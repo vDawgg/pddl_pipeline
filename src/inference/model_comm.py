@@ -1,4 +1,6 @@
+import base64
 import inspect
+import io
 import json
 import logging
 import re
@@ -14,6 +16,8 @@ from typing import (
     get_origin,
     get_type_hints,
 )
+
+from PIL.Image import open as open_image
 
 from src.utils.prompts import Prompts, get_prompt
 
@@ -44,17 +48,24 @@ def make_user_message(message: str) -> dict:
     }
 
 
-def make_user_message_with_image(message: str, b64_images: list[str]) -> dict:
+def encode_image(img_path: str):
+    img = open_image(img_path)
+    img_bytes_arr = io.BytesIO()
+    img.save(img_bytes_arr, format="png")
+    return base64.b64encode(img_bytes_arr.getvalue()).decode("utf-8")
+
+
+def make_user_message_with_image(message: str, img_paths: list[str]) -> dict:
     user_message = make_user_message(message)
     user_message["content"].extend(
         [
             {
                 "type": "image_url",
                 "image_url": {
-                    "url": f"data:image/png;base64,{b64_image}",
+                    "url": f"data:image/png;base64,{encode_image(img)}",
                 },
             }
-            for b64_image in b64_images
+            for img in img_paths
         ]
     )
     return user_message

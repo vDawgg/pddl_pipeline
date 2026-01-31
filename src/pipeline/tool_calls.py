@@ -6,6 +6,7 @@ from tempfile import NamedTemporaryFile
 
 import openai
 
+from src.base.pipeline import Pipelines
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
 from src.constants import project_root
 from src.eval.fast_downward import FDErrorInfo
@@ -17,6 +18,7 @@ from src.inference.model_comm import (
     make_prompt_with_trajectory,
     make_tool,
     make_user_message,
+    make_user_message_with_image,
     parse_react_message,
 )
 from src.pipeline.val_and_planner_feedback import ValAndPlannerFeedbackPipeline
@@ -27,8 +29,7 @@ logger = logging.getLogger(__name__)
 
 class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
     def __init__(self, model, domain, pipeline=None):
-        super().__init__(model, domain, pipeline)
-        self.name = "tool_call_pipeline"
+        super().__init__(model, domain, pipeline or Pipelines.TOOL_CALL)
 
     # Tools
     def create_pddl_file(self, content: str, pddl_file_type: PDDLFiles) -> str:
@@ -111,7 +112,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         with open(temp_file.name, "w") as f:
             file_contents[start : end + 1] = [r + "\n" for r in new.split("\n")]
             f.write("".join(file_contents))
-        # TODO: Think about providing thw would be content after the change in the message here as well
+        # TODO: Think about providing the would be content after the change in the message here as well
         if "domain" in file:
             err_info = _get_syntax_mistakes_domain(Path(temp_file.name))
             logger.debug(f"Error Info domain after edit: {err_info.errors}")
@@ -219,6 +220,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         self,
         input_prompt: str,
         tools: list[Callable],
+        image_paths: list[str] | None = None,
         max_iters: int = 10,
         max_past_setup: int = 3,
     ) -> str:
@@ -256,7 +258,11 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
                 client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        make_user_message(prompt_with_trajectory)  # type: ignore
+                        make_user_message(prompt_with_trajectory)
+                        if image_paths is None
+                        else make_user_message_with_image(
+                            prompt_with_trajectory, image_paths
+                        )  # type: ignore
                     ],
                 )
                 .choices[0]

@@ -9,7 +9,13 @@ from src.inference import Models
 from src.inference.model_comm import make_assistant_message
 from src.pipeline.baseline import Baseline
 from src.utils.domains import Domains
-from src.utils.prompts import Prompts, domain_pompts, get_prompt, problem_prompts
+from src.utils.prompts import (
+    Prompts,
+    domain_prompts,
+    get_prompt,
+    make_file_view,
+    problem_prompts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +26,12 @@ class ValFeedbackPipeline(Baseline):
     ):
         super().__init__(model, domain, pipeline or Pipelines.VAL_FEEDBACK)
 
-    def fix_domain(self, domain_file: Path, num_tries: int = 5):
+    def fix_domain(
+        self,
+        domain_file: Path,
+        num_tries: int = 5,
+        image_paths: list[str] | None = None,
+    ):
         for i in range(num_tries):
             err_info = get_syntax_mistakes_domain(domain_file)
             self.domain_syntax_errors_calls += 1
@@ -28,18 +39,28 @@ class ValFeedbackPipeline(Baseline):
                 break
             else:
                 logger.debug(f"Iterations domain syntax fixes: {i}")
-                prompt = get_prompt(
-                    Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_DOMAIN
-                ).format(
-                    domain=self._read_pddl_file(domain_file),
+                if image_paths is None:
+                    unformatted_prompt = get_prompt(
+                        Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_DOMAIN
+                    )
+                else:
+                    unformatted_prompt = get_prompt(
+                        Prompts.VAL_FEEDBACK_CONTEXT_IMAGES, Prompts.VAL_FEEDBACK_DOMAIN
+                    )
+                prompt = unformatted_prompt.format(
+                    domain=make_file_view(self._read_pddl_file(domain_file)),
                     errors=err_info.get_lines_with_errors(),
                 )
-                domain, _ = self.make_request(
-                    prompt,
-                )
+                domain, _ = self.make_request(prompt, img_paths=image_paths)
                 domain_file = self._write_pddl_file(domain, file=domain_file)
 
-    def fix_problem(self, domain_file: Path, problem_file: Path, num_tries: int = 5):
+    def fix_problem(
+        self,
+        domain_file: Path,
+        problem_file: Path,
+        num_tries: int = 5,
+        image_paths: list[str] | None = None,
+    ):
         for i in range(num_tries):
             err_info = get_syntax_mistakes_problem(domain_file, problem_file)
             self.problem_syntax_mistakes_calls += 1
@@ -47,21 +68,26 @@ class ValFeedbackPipeline(Baseline):
                 break
             else:
                 logger.debug(f"Iterations problem syntax fixes: {i}")
-                prompt = get_prompt(
-                    Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_DOMAIN
-                ).format(
-                    domain=self._read_pddl_file(domain_file),
-                    problem=self._read_pddl_file(problem_file),
+                if image_paths is None:
+                    unformatted_prompt = get_prompt(
+                        Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_PROBLEM
+                    )
+                else:
+                    unformatted_prompt = get_prompt(
+                        Prompts.VAL_FEEDBACK_CONTEXT_IMAGES,
+                        Prompts.VAL_FEEDBACK_PROBLEM,
+                    )
+                prompt = unformatted_prompt.format(
+                    domain=make_file_view(self._read_pddl_file(domain_file)),
+                    problem=make_file_view(self._read_pddl_file(problem_file)),
                     errors=err_info.get_lines_with_errors(),
                 )
-                problem, _ = self.make_request(
-                    prompt,
-                )
+                problem, _ = self.make_request(prompt, img_paths=image_paths)
                 problem_file = self._write_pddl_file(problem, file=problem_file)
 
     def _run_impl(self) -> PipelineResult:
         domain, messages = self.make_request(
-            domain_pompts[self.domain],
+            domain_prompts[self.domain],
         )
         self.domain_file = self._write_pddl_file(
             domain, pddl_file_type=PDDLFiles.DOMAIN

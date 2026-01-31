@@ -17,7 +17,7 @@ from src.inference.model_comm import (
     make_user_message_with_image,
 )
 from src.utils.domains import Domains
-from src.utils.prompts import domain_pompts, problem_prompts
+from src.utils.prompts import domain_prompts, problem_prompts
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +55,9 @@ class Baseline(PipelineBase):
         input_prompt: str,
         messages: list[Any] | None = None,
         format: type[T] | None = None,
-        imgs: list[str] | None = None,
+        img_paths: list[str] | None = None,
     ) -> tuple[T | str, list[Any]]:
+        self.num_model_calls += 1
         messages = messages or []
 
         logger.debug("# User Message")
@@ -71,8 +72,8 @@ class Baseline(PipelineBase):
             api_key=open(str(key_path)).readline().strip(),
         )
 
-        if imgs:
-            messages.append(make_user_message_with_image(input_prompt, imgs))
+        if img_paths:
+            messages.append(make_user_message_with_image(input_prompt, img_paths))
         else:
             messages.append(make_user_message(input_prompt))
 
@@ -89,6 +90,7 @@ class Baseline(PipelineBase):
             response = client.chat.completions.create(
                 model=self.model,
                 messages=messages,
+                service_tier="priority",
             )
             res = response.choices[0].message.content
             logger.debug("# Assistant Message")
@@ -100,7 +102,7 @@ class Baseline(PipelineBase):
 
     def _run_impl(self) -> PipelineResult:
         domain, messages = self.make_request(
-            domain_pompts[self.domain],
+            domain_prompts[self.domain],
         )
         self.domain_file = self._write_pddl_file(
             domain, pddl_file_type=PDDLFiles.DOMAIN

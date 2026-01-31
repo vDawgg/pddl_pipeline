@@ -1,6 +1,7 @@
 import logging
 import shutil
 import time
+import traceback
 from abc import ABC, abstractmethod
 from enum import Enum, StrEnum, auto
 from pathlib import Path
@@ -29,7 +30,9 @@ class Pipelines(StrEnum):
     BASELINE = auto()
     VAL_FEEDBACK = auto()
     VAL_AND_PLANNER_FEEDBACK = auto()
+    VAL_AND_PLANNER_FEEDBACK_IMAGE = auto()
     TOOL_CALL = auto()
+    TOOL_CALL_IMAGE = auto()
     TOOL_CALL_MULTI_AGENT = auto()
 
 
@@ -89,17 +92,15 @@ class PipelineBase(ABC):
         self.domain_file = None
         self.problem_file = None
         self.plan_file = None
-        self.log_file = (
-            logs_dir
-            / f"{self.domain}_{self.name}_{self.model}_{get_current_timestamp()}.log"
-        )
+        self.log_file = logs_dir / f"{self.name}_{get_current_timestamp()}.log"
         file_handler = add_file_handler(self.log_file)
         start = time.perf_counter()
         try:
             result = self._run_impl()
-        except Exception as e:
+        except Exception:
             self.elapsed_time = time.perf_counter() - start
-            logger.debug(f"Caught exception while running inference: {e}")
+            logger.debug("Caught exception while running inference:")
+            logger.debug(traceback.print_exc())
             result = self.create_result(error=PipelineError.MODEL_FAILURE)
         else:
             self.elapsed_time = time.perf_counter() - start
@@ -116,10 +117,7 @@ class PipelineBase(ABC):
         results: list[PipelineResult] = []
         for _ in tqdm(range(iterations), "Running Evaluation"):
             results.append(self.run())
-        results_name = (
-            results_dir
-            / f"{self.domain}_{self.name}_{self.model}_{get_current_timestamp()}.csv"
-        )
+        results_name = results_dir / f"{self.name}_{get_current_timestamp()}.csv"
 
         def serialize_value(v):
             if isinstance(v, Enum):
@@ -142,10 +140,7 @@ class PipelineBase(ABC):
                 latest_plan = candidate_path
             else:
                 break
-        plan_name = (
-            plans_dir
-            / f"{self.domain}_{self.name}_{self.model}_{get_current_timestamp()}.plan"
-        )
+        plan_name = plans_dir / f"{self.name}_{get_current_timestamp()}.plan"
         shutil.copyfile(latest_plan, plan_name)
         return plan_name
 
@@ -191,7 +186,7 @@ class PipelineBase(ABC):
         file_path = (
             file
             or generated_pddl_dir
-            / f"{self.domain}_{pddl_file_type}_{self.name}_{self.model}_{get_current_timestamp()}.pddl"
+            / f"{self.domain}_{pddl_file_type}_{self.name}_{get_current_timestamp()}.pddl"
         )
         with open(file_path, "w") as f:
             f.write(pddl)

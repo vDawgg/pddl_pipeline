@@ -1,6 +1,6 @@
 ## Task description
 
-Your task is to generate the PDDL problem given the following problem description and the previously generated PDDL domain.
+Your task is to generate the PDDL problem given the following task description and the previously generated PDDL domain.
 
 There are 5 colored pegs with the following colors: red, green, blue, pink, yellow. The pegs are all named in the format <color>_peg. Additionally there are 3 colored rings: red, green and blue. Similarly to the pegs, the rings are named <color>_ring.
 
