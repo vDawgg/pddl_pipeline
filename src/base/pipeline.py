@@ -175,7 +175,7 @@ class PipelineBase(ABC):
         ):
             return self._save_plan(Path(plan_file.name))
         else:
-            return parse_error(fd_code, process.stdout)
+            return parse_error(fd_code, domain_file, problem_file)
 
     def _write_pddl_file(
         self,

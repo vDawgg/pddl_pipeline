@@ -85,7 +85,11 @@ def detect_file_type(output: str) -> PDDLFiles | None:
     last_file_type = None
     for line in lines:
         stripped = line.strip()
-        if stripped == "Parsing domain" or stripped.startswith("Parsing domain"):
+        if (
+            stripped == "Parsing domain"
+            or stripped.startswith("Parsing domain")
+            or "Could not parse domain file" in stripped
+        ):
             last_file_type = PDDLFiles.DOMAIN
         elif stripped == "Parsing task" or stripped.startswith("Parsing task"):
             last_file_type = PDDLFiles.PROBLEM
@@ -281,9 +285,14 @@ def translate_pddl(domain_file: Path, problem_file: Path) -> FDErrorInfo | None:
     return None
 
 
-def parse_error(fd_code: ExitCodes, output: str) -> FDErrorInfo:
+def parse_error(
+    fd_code: ExitCodes, domain_file: Path, problem_file: Path
+) -> FDErrorInfo:
     if is_translate_error(fd_code):
-        return translate_parser.parse_translate_error(output, fd_code)
+        # Run translator only on the same files to get better output
+        translate_output = translate_pddl(domain_file, problem_file)
+        assert translate_output is not None
+        return translate_output
     elif is_unsolvable(fd_code):
         return FDErrorInfo(
             fd_code,
