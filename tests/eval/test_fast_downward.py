@@ -44,6 +44,29 @@ class TestFastDownward:
             == "Domain definition expected to start with '(define '. Got '(:domain'"
         )
 
+    def test_duplicate_objects(self):
+        pddl_dir = eval_resource_dir / "test_duplicate_objects"
+        error_info = self.pipeline._generate_plan(
+            pddl_dir / "domain.pddl",
+            pddl_dir / "problem.pddl",
+        )
+        assert type(error_info) is FDErrorInfo
+        assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
+        assert error_info.file == PDDLFiles.DOMAIN
+        assert (
+            error_info.error_message
+            == "Domain contains :constants referenced again in problem. Prefer object definition in problem only.error: duplicate object 'peg1'\n"
+            + "error: duplicate object 'peg2'\n"
+            + "error: duplicate object 'peg3'\n"
+            + "error: duplicate object 'peg4'\n"
+            + "error: duplicate object 'peg5'\n"
+            + "error: duplicate object 'ring-red'\n"
+            + "error: duplicate object 'ring-blue'\n"
+            + "error: duplicate object 'ring-green'\n"
+            + "error: duplicate object 'ring-yellow'\n"
+            + "error: duplicate object 'ring-purple'"
+        )
+
     def test_search_unsolved(self):
         pddl_dir = eval_resource_dir / "test_search_unsolved"
         error_info = self.pipeline._generate_plan(

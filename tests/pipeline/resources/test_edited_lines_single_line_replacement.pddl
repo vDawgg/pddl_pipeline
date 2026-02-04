@@ -2,8 +2,7 @@
 
   (:requirements :strips :typing)
 
-  (:types block robot)
-  (:action dummy)
+  (:types block)
 
   (:predicates
    (on ?b1 ?b2)

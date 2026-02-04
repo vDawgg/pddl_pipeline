@@ -85,6 +85,7 @@ def detect_file_type(output: str) -> PDDLFiles | None:
     last_file_type = None
     for line in lines:
         stripped = line.strip()
+        logger.debug(stripped)
         if (
             stripped == "Parsing domain"
             or stripped.startswith("Parsing domain")
@@ -145,8 +146,9 @@ class TranslateParser:
         self.python_version = re.compile(
             r"Error: Translator only supports Python >= (\d+\.\d+)"
         )
+        self.duplicate_object = re.compile(r"error: duplicate .*")
 
-    def parse_translate_error(self, output: str, fd_code: ExitCodes) -> FDErrorInfo:
+    def parse_translate_error(self, output: str, fd_code: ExitCodes) -> FDErrorInfo:  # noqa: C901
         if fd_code == ExitCodes.TRANSLATE_OUT_OF_MEMORY:
             return FDErrorInfo(fd_code, "Translator ran out of memory")
         elif fd_code == ExitCodes.TRANSLATE_OUT_OF_TIME:
@@ -198,6 +200,13 @@ class TranslateParser:
                 fd_code,
                 f"Object fluents not supported: function '{match.group(1)}' has type '{match.group(2)}'",
                 detect_file_type(output),
+            )
+        elif match := self.duplicate_object.findall(output):
+            match_string = "\n".join(match)
+            return FDErrorInfo(
+                fd_code,
+                f"Domain contains :constants referenced again in problem. Prefer object definition in problem only.{match_string}",
+                PDDLFiles.DOMAIN,
             )
         return self._parse_semantic_error(output, fd_code)
 

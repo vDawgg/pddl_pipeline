@@ -216,6 +216,7 @@ __marimo__/
 
 notes/
 .openai-key
+.openrouter-key
 plans/*
 !plans/.gitkeep
 pddl/generated/*

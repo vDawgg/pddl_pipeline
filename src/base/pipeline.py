@@ -31,6 +31,7 @@ class Pipelines(StrEnum):
     VAL_FEEDBACK = auto()
     VAL_AND_PLANNER_FEEDBACK = auto()
     VAL_AND_PLANNER_FEEDBACK_IMAGE = auto()
+    DSPY_VAL_AND_PLANNER_FEEDBACK = auto()
     TOOL_CALL = auto()
     TOOL_CALL_IMAGE = auto()
     TOOL_CALL_MULTI_AGENT = auto()
@@ -44,7 +45,7 @@ class PipelineBase(ABC):
         # TODO: Just add these prompts according to the domain to this class. The dicts are too much.
         self.domain = domain
         self.pipeline = pipeline
-        self.name = f"{self.domain}_{self.pipeline}_{self.model}"
+        self.name = f"{self.domain}_{self.pipeline}_{self.model.split('/')[-1]}"
         self.elapsed_time: float = 0.0
         self.num_model_calls: int = 0
         self.create_pddl_file_calls = 0
@@ -97,9 +98,10 @@ class PipelineBase(ABC):
         start = time.perf_counter()
         try:
             result = self._run_impl()
-        except Exception:
+        except Exception as e:
             self.elapsed_time = time.perf_counter() - start
             logger.debug("Caught exception while running inference:")
+            logger.debug(e)
             logger.debug(traceback.print_exc())
             result = self.create_result(error=PipelineError.MODEL_FAILURE)
         else:
