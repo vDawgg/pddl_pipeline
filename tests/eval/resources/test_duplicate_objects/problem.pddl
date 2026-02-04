@@ -1,0 +1,36 @@
+(define (problem ring-sorting-problem)
+  (:domain ring-sorting)
+  (:objects
+    peg1 peg2 peg3 peg4 peg5
+    ring-red ring-blue ring-green ring-yellow ring-purple
+  )
+  (:init
+    (at robot-arm peg1)
+    (on ring-red peg5)
+    (on ring-blue peg1)
+    (on ring-green peg3)
+    (at-peg peg1)
+    (at-peg peg2)
+    (at-peg peg3)
+    (at-peg peg4)
+    (at-peg peg5)
+    (gripper-open robot-arm)
+    (color ring-red red)
+    (color ring-blue blue)
+    (color ring-green green)
+    (color ring-yellow yellow)
+    (color ring-purple purple)
+    (color peg1 red)
+    (color peg2 blue)
+    (color peg3 green)
+    (color peg4 yellow)
+    (color peg5 pink)
+  )
+  (:goal
+    (and
+      (on ring-red peg1)
+      (on ring-blue peg2)
+      (on ring-green peg3)
+    )
+  )
+)
