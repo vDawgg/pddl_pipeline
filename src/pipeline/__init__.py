@@ -1,5 +1,6 @@
 from src.base.pipeline import Pipelines
 from src.pipeline.baseline import Baseline
+from src.pipeline.dspy_tool_calls import DSPyToolCallPipeline
 from src.pipeline.dspy_val_and_planner_feedback import DSPyValAndPlannerFeedbackPipeline
 from src.pipeline.tool_calls import ToolCallPipeline
 from src.pipeline.tool_calls_image import ToolCallImagePipeline
@@ -19,4 +20,5 @@ pipelines = {
     Pipelines.TOOL_CALL: ToolCallPipeline,
     Pipelines.TOOL_CALL_IMAGE: ToolCallImagePipeline,
     Pipelines.TOOL_CALL_MULTI_AGENT: ToolCallPipelineMutltiAgent,
+    Pipelines.DSPY_TOOL_CALL: DSPyToolCallPipeline,
 }

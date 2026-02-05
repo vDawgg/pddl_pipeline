@@ -1,10 +1,9 @@
 import logging
-from abc import ABCMeta
 from pathlib import Path
 
 import dspy
 
-from src.base.pipeline import Pipelines
+from src.base.pipeline import CombinedMeta, Pipelines
 from src.base.schema import PDDLFiles, PipelineError
 from src.constants import project_root
 from src.eval.fast_downward import ExitCodes, FDErrorInfo
@@ -17,143 +16,90 @@ from src.utils.prompts import Prompts, domain_prompts, get_prompt, problem_promp
 logger = logging.getLogger(__name__)
 
 
-def _make_generate_domain_signature() -> type[dspy.Signature]:
-    instructions = get_prompt(Prompts.GENERATION_CONTEXT)
+# TODO: Think about moving these signatures to the module.
+#       this might enable better reuse but also might not
+class GenerateDomain(dspy.Signature):
+    __doc__ = get_prompt(Prompts.GENERATION_CONTEXT)
 
-    class GenerateDomain(dspy.Signature):
-        __doc__ = instructions
-
-        task_description: str = dspy.InputField(
-            desc="Natural language description of the planning domain to model"
-        )
-        domain_pddl: str = dspy.OutputField(
-            desc="Complete PDDL domain file adhering to PDDL 2.1 standard"
-        )
-
-    return GenerateDomain
-
-
-def _make_generate_problem_signature() -> type[dspy.Signature]:
-    instructions = get_prompt(Prompts.GENERATION_CONTEXT)
-
-    class GenerateProblem(dspy.Signature):
-        __doc__ = instructions
-
-        domain_pddl: str = dspy.InputField(
-            desc="The previously generated PDDL domain file"
-        )
-        problem_description: str = dspy.InputField(
-            desc="Natural language description of the specific problem instance"
-        )
-        problem_pddl: str = dspy.OutputField(
-            desc="Complete PDDL problem file adhering to PDDL 2.1 standard"
-        )
-
-    return GenerateProblem
-
-
-def _make_fix_domain_syntax_signature() -> type[dspy.Signature]:
-    instructions = get_prompt(Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_DOMAIN)
-
-    class FixDomainSyntax(dspy.Signature):
-        __doc__ = instructions
-
-        domain_pddl: str = dspy.InputField(
-            desc="The PDDL domain file containing syntax errors"
-        )
-        errors: str = dspy.InputField(
-            desc="List of syntax errors with line numbers and error messages"
-        )
-        fixed_domain_pddl: str = dspy.OutputField(
-            desc="The corrected PDDL domain file with all syntax errors fixed"
-        )
-
-    return FixDomainSyntax
-
-
-def _make_fix_problem_syntax_signature() -> type[dspy.Signature]:
-    instructions = get_prompt(
-        Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_PROBLEM
+    task_description: str = dspy.InputField(
+        desc="Natural language description of the planning domain to model"
+    )
+    domain_pddl: str = dspy.OutputField(
+        desc="Complete PDDL domain file adhering to PDDL 2.1 standard"
     )
 
-    class FixProblemSyntax(dspy.Signature):
-        __doc__ = instructions
 
-        domain_pddl: str = dspy.InputField(
-            desc="The syntactically correct PDDL domain file for context"
-        )
-        problem_pddl: str = dspy.InputField(
-            desc="The PDDL problem file containing syntax errors"
-        )
-        errors: str = dspy.InputField(
-            desc="List of syntax errors with line numbers and error messages"
-        )
-        fixed_problem_pddl: str = dspy.OutputField(
-            desc="The corrected PDDL problem file with all syntax errors fixed"
-        )
+class GenerateProblem(dspy.Signature):
+    __doc__ = get_prompt(Prompts.GENERATION_CONTEXT)
 
-    return FixProblemSyntax
+    domain_pddl: str = dspy.InputField(desc="The previously generated PDDL domain file")
+    problem_description: str = dspy.InputField(
+        desc="Natural language description of the specific problem instance"
+    )
+    problem_pddl: str = dspy.OutputField(
+        desc="Complete PDDL problem file adhering to PDDL 2.1 standard"
+    )
 
 
-def _make_fix_unsolvable_signature() -> type[dspy.Signature]:
-    instructions = get_prompt(Prompts.PLANNER_CONTEXT, Prompts.PLANNER_TASK)
+class FixDomainSyntax(dspy.Signature):
+    __doc__ = get_prompt(Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_DOMAIN)
 
-    class FixUnsolvablePDDL(dspy.Signature):
-        __doc__ = instructions
-
-        file_to_fix: str = dspy.InputField(
-            desc="Which file to fix: 'domain' or 'problem'"
-        )
-        domain_pddl: str = dspy.InputField(desc="The current PDDL domain file")
-        problem_pddl: str = dspy.InputField(desc="The current PDDL problem file")
-        fixed_pddl: str = dspy.OutputField(
-            desc="The fixed PDDL file (domain or problem as specified)"
-        )
-
-    return FixUnsolvablePDDL
+    domain_pddl: str = dspy.InputField(
+        desc="The PDDL domain file containing syntax errors"
+    )
+    errors: str = dspy.InputField(
+        desc="List of syntax errors with line numbers and error messages"
+    )
+    fixed_domain_pddl: str = dspy.OutputField(
+        desc="The corrected PDDL domain file with all syntax errors fixed"
+    )
 
 
-def _make_fix_translate_error_signature() -> type[dspy.Signature]:
-    instructions = get_prompt(
+class FixProblemSyntax(dspy.Signature):
+    __doc__ = get_prompt(Prompts.VAL_FEEDBACK_CONTEXT, Prompts.VAL_FEEDBACK_PROBLEM)
+
+    domain_pddl: str = dspy.InputField(
+        desc="The syntactically correct PDDL domain file for context"
+    )
+    problem_pddl: str = dspy.InputField(
+        desc="The PDDL problem file containing syntax errors"
+    )
+    errors: str = dspy.InputField(
+        desc="List of syntax errors with line numbers and error messages"
+    )
+    fixed_problem_pddl: str = dspy.OutputField(
+        desc="The corrected PDDL problem file with all syntax errors fixed"
+    )
+
+
+class FixUnsolvablePDDL(dspy.Signature):
+    __doc__ = get_prompt(Prompts.PLANNER_CONTEXT, Prompts.PLANNER_TASK)
+
+    file_to_fix: str = dspy.InputField(desc="Which file to fix: 'domain' or 'problem'")
+    domain_pddl: str = dspy.InputField(desc="The current PDDL domain file")
+    problem_pddl: str = dspy.InputField(desc="The current PDDL problem file")
+    fixed_pddl: str = dspy.OutputField(
+        desc="The fixed PDDL file (domain or problem as specified)"
+    )
+
+
+class FixTranslateError(dspy.Signature):
+    __doc__ = get_prompt(
         Prompts.PLANNER_TRANSLATE_CONTEXT, Prompts.PLANNER_TRANSLATE_TASK
     )
 
-    class FixTranslateError(dspy.Signature):
-        __doc__ = instructions
-
-        file_to_fix: str = dspy.InputField(
-            desc="Which file to fix: 'domain' or 'problem'"
-        )
-        error_message: str = dspy.InputField(
-            desc="The error message from the planner's translator"
-        )
-        file_content: str = dspy.InputField(desc="The content of the file to fix")
-        fixed_pddl: str = dspy.OutputField(
-            desc="The fixed PDDL file with the translation error resolved"
-        )
-
-    return FixTranslateError
-
-
-GenerateDomain = _make_generate_domain_signature()
-GenerateProblem = _make_generate_problem_signature()
-FixDomainSyntax = _make_fix_domain_syntax_signature()
-FixProblemSyntax = _make_fix_problem_syntax_signature()
-FixUnsolvablePDDL = _make_fix_unsolvable_signature()
-FixTranslateError = _make_fix_translate_error_signature()
-
-
-_ProgramMeta = type(dspy.Module)
-
-
-class _CombinedMeta(_ProgramMeta, ABCMeta):
-    """Metaclass combining dspy's ProgramMeta with ABCMeta for multiple inheritance."""
-
-    ...
+    file_to_fix: str = dspy.InputField(desc="Which file to fix: 'domain' or 'problem'")
+    error_message: str = dspy.InputField(
+        desc="The error message from the planner's translator"
+    )
+    file_content: str = dspy.InputField(desc="The content of the file to fix")
+    fixed_pddl: str = dspy.OutputField(
+        desc="The fixed PDDL file with the translation error resolved"
+    )
 
 
 class DSPyValAndPlannerFeedbackPipeline(
-    dspy.Module, ValFeedbackPipeline, metaclass=_CombinedMeta
+    dspy.Module, ValFeedbackPipeline, metaclass=CombinedMeta
 ):
     def __init__(
         self, model: Models, domain: Domains, pipeline: Pipelines | None = None
@@ -168,13 +114,13 @@ class DSPyValAndPlannerFeedbackPipeline(
         if not key_path.exists():
             raise FileNotFoundError(f"API key file not found: {key_path}")
         api_key = open(str(key_path)).readline().strip()
-        lm = dspy.LM(
+        self.lm = dspy.LM(
             model=model_config.api_model_name,
             api_key=api_key,
             api_base=model_config.base_url,
             cache=False,  # Disable DSPy's built-in response caching
         )
-        dspy.configure(lm=lm)
+        dspy.configure(lm=self.lm)
 
         self.generate_domain_module = dspy.ChainOfThought(GenerateDomain)
         self.generate_problem_module = dspy.ChainOfThought(GenerateProblem)
@@ -312,13 +258,17 @@ class DSPyValAndPlannerFeedbackPipeline(
         self.num_model_calls += 1
         domain_result = self.generate_domain_module(task_description=task_prompt)
         domain = domain_result.domain_pddl
+        self.print_and_clear_history()
 
         self.domain_file = self._write_pddl_file(
             domain, pddl_file_type=PDDLFiles.DOMAIN
         )
         self.fix_domain(self.domain_file)
         if not self.is_domain_valid(self.domain_file):
+            self.print_and_clear_history()
+            logger.debug("Domain failure")
             return dspy.Prediction(out=PipelineError.DOMAIN_FAILURE)
+        self.print_and_clear_history()
 
         problem_prompt = problem_prompts[self.domain]
         self.num_model_calls += 1
@@ -326,22 +276,33 @@ class DSPyValAndPlannerFeedbackPipeline(
             domain_pddl=domain, problem_description=problem_prompt
         )
         problem = problem_result.problem_pddl
+        self.print_and_clear_history()
 
         self.problem_file = self._write_pddl_file(
             problem, pddl_file_type=PDDLFiles.PROBLEM
         )
         self.fix_problem(self.domain_file, self.problem_file)
         if not self.is_problem_valid(self.domain_file, self.problem_file):
+            self.print_and_clear_history()
             logger.debug("Problem failure")
             return dspy.Prediction(out=PipelineError.PROBLEM_FAILURE)
+        self.print_and_clear_history()
 
         planner_output = self.fix_planning(self.domain_file, self.problem_file)
         if isinstance(planner_output, FDErrorInfo):
+            self.print_and_clear_history()
             logger.debug("Failed to generate a plan")
             return dspy.Prediction(out=planner_output.to_pipeline_error())
         logger.debug("# Successfully generated a plan")
         self.plan_file = planner_output
+        self.print_and_clear_history()
         return dspy.Prediction(out=None)
+
+    def print_and_clear_history(self):
+        # Log interaction history in one shot and clear everything after
+        # to always get interactions from last run only
+        logger.debug(self.lm.inspect_history())
+        self.lm.history.clear()
 
     def compile_module(self):
         # TODO: Implement one of the dspy optimization functions for this module here.
