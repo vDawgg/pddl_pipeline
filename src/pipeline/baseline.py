@@ -10,7 +10,7 @@ from src.base.schema import PDDLFiles, PipelineError, PipelineResult
 from src.constants import project_root
 from src.eval.fast_downward import FDErrorInfo
 from src.eval.val import get_syntax_mistakes_domain, get_syntax_mistakes_problem
-from src.inference import Models, provider_hosts, provider_keys
+from src.inference import Models, get_model_config
 from src.inference.model_comm import (
     make_assistant_message,
     make_user_message,
@@ -63,12 +63,13 @@ class Baseline(PipelineBase):
         logger.debug("# User Message")
         logger.debug(input_prompt)
 
-        key_path = project_root / provider_keys[self.model]
+        model_config = get_model_config(self.model)
+        key_path = project_root / model_config.key_file
         if not key_path.exists():
             raise FileNotFoundError(f"API key file not found: {key_path}")
 
         client = openai.OpenAI(
-            base_url=provider_hosts[self.model],
+            base_url=model_config.base_url,
             api_key=open(str(key_path)).readline().strip(),
         )
 
@@ -79,7 +80,7 @@ class Baseline(PipelineBase):
 
         if format:
             response = client.beta.chat.completions.parse(
-                model=self.model,
+                model=model_config.api_model_name,
                 messages=messages,
                 response_format=format,
             )
@@ -88,7 +89,7 @@ class Baseline(PipelineBase):
             return res, messages
         else:
             response = client.chat.completions.create(
-                model=self.model,
+                model=model_config.api_model_name,
                 messages=messages,
                 service_tier="priority",
             )

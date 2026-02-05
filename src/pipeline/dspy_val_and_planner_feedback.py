@@ -9,7 +9,7 @@ from src.base.schema import PDDLFiles, PipelineError
 from src.constants import project_root
 from src.eval.fast_downward import ExitCodes, FDErrorInfo
 from src.eval.val import get_syntax_mistakes_domain, get_syntax_mistakes_problem
-from src.inference import Models, provider_hosts, provider_keys
+from src.inference import Models, get_model_config
 from src.pipeline.val_feedback import ValFeedbackPipeline
 from src.utils.domains import Domains
 from src.utils.prompts import Prompts, domain_prompts, get_prompt, problem_prompts
@@ -163,15 +163,15 @@ class DSPyValAndPlannerFeedbackPipeline(
             self, model, domain, pipeline or Pipelines.DSPY_VAL_AND_PLANNER_FEEDBACK
         )
 
-        key_path = project_root / provider_keys[self.model]
+        model_config = get_model_config(self.model)
+        key_path = project_root / model_config.key_file
         if not key_path.exists():
             raise FileNotFoundError(f"API key file not found: {key_path}")
         api_key = open(str(key_path)).readline().strip()
-        base_url = provider_hosts[self.model]
         lm = dspy.LM(
-            model=f"openai/{self.model}",
+            model=model_config.api_model_name,
             api_key=api_key,
-            api_base=base_url,
+            api_base=model_config.base_url,
             cache=False,  # Disable DSPy's built-in response caching
         )
         dspy.configure(lm=lm)

@@ -13,7 +13,7 @@ from src.eval.fast_downward import FDErrorInfo
 from src.eval.fast_downward import translate_pddl as _translate_pddl
 from src.eval.val import get_syntax_mistakes_domain as _get_syntax_mistakes_domain
 from src.eval.val import get_syntax_mistakes_problem as _get_syntax_mistakes_problem
-from src.inference import provider_hosts, provider_keys
+from src.inference import get_model_config
 from src.inference.model_comm import (
     make_prompt_with_trajectory,
     make_tool,
@@ -231,11 +231,12 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         base_prompt = unformatted_base_prompt.format(tools=tools_json)
         input_prompt = base_prompt + input_prompt
 
-        key_path = project_root / provider_keys[self.model]
+        model_config = get_model_config(self.model)
+        key_path = project_root / model_config.key_file
         if not key_path.exists():
             raise FileNotFoundError(f"API key file not found: {key_path}")
         client = openai.OpenAI(
-            base_url=provider_hosts[self.model],
+            base_url=model_config.base_url,
             api_key=open(str(key_path)).readline().strip(),
         )
 
@@ -256,7 +257,7 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
             logger.debug(f"# Prompts with trajectory:\n{prompt_with_trajectory}")
             res = (
                 client.chat.completions.create(
-                    model=self.model,
+                    model=model_config.api_model_name,
                     messages=[
                         make_user_message(prompt_with_trajectory)
                         if image_paths is None
