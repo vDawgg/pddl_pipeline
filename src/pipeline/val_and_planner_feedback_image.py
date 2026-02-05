@@ -13,7 +13,9 @@ logger = logging.getLogger()
 
 class ValAndPLannerFeedbackImagePipeline(ValAndPlannerFeedbackPipeline):
     def __init__(self, model, domain, pipeline=None):
-        super().__init__(model, domain, pipeline or Pipelines.VAL_AND_PLANNER_FEEDBACK)
+        super().__init__(
+            model, domain, pipeline or Pipelines.VAL_AND_PLANNER_FEEDBACK_IMAGE
+        )
 
     def _run_impl(self):
         # TODO: This should be loaded depending on the currently used domain
