@@ -106,7 +106,10 @@ class FDErrorInfo:
         self.file = file
 
     def to_str(self):
-        return f"# Error message: {self.error_message}\n# Affected file: {self.file}\n"
+        base = f"# Error message: {self.error_message}\n"
+        if self.file is None:
+            return base
+        return base + "# Affected file: {self.file}\n"
 
     def to_pipeline_error(self) -> PipelineError:
         if is_translate_error(self.exit_code):
