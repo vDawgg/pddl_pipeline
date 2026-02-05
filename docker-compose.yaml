@@ -33,6 +33,11 @@ x-pipeline-common-env: &pipeline-common-env
 
 x-pipeline-base: &pipeline-base
   build: .
+  volumes:
+    - ./logs:/app/logs
+    - ./pddl:/app/pddl
+    - ./plans:/app/plans
+    - ./results:/app/results
 
 services:
   qwen_25_coder:

@@ -2,13 +2,14 @@ import logging
 import shutil
 import time
 import traceback
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, StrEnum, auto
 from pathlib import Path
 from subprocess import run
 from tempfile import NamedTemporaryFile
 from typing import TypeVar
 
+import dspy
 import polars as pl
 from pydantic import BaseModel
 from tqdm import tqdm
@@ -26,6 +27,15 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
+_ProgramMeta = type(dspy.Module)
+
+
+class CombinedMeta(_ProgramMeta, ABCMeta):
+    """Metaclass combining dspy's ProgramMeta with ABCMeta for multiple inheritance."""
+
+    ...
+
+
 class Pipelines(StrEnum):
     BASELINE = auto()
     VAL_FEEDBACK = auto()
@@ -35,6 +45,7 @@ class Pipelines(StrEnum):
     TOOL_CALL = auto()
     TOOL_CALL_IMAGE = auto()
     TOOL_CALL_MULTI_AGENT = auto()
+    DSPY_TOOL_CALL = auto()
 
 
 class PipelineBase(ABC):
