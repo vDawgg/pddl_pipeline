@@ -49,10 +49,12 @@ def make_user_message(message: str) -> dict:
 
 
 def encode_image(img_path: str):
-    img = open_image(img_path)
-    img_bytes_arr = io.BytesIO()
-    img.save(img_bytes_arr, format="png")
-    return base64.b64encode(img_bytes_arr.getvalue()).decode("utf-8")
+    with open_image(img_path) as img:
+        img_bytes_arr = io.BytesIO()
+        img.save(img_bytes_arr, format="png")
+        encoded = base64.b64encode(img_bytes_arr.getvalue()).decode("utf-8")
+        img_bytes_arr.close()
+        return encoded
 
 
 def make_user_message_with_image(message: str, img_paths: list[str]) -> dict:

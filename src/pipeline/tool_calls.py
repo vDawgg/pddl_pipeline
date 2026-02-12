@@ -4,16 +4,12 @@ from collections.abc import Callable
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-import openai
-
 from src.base.pipeline import Pipelines
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
-from src.constants import project_root
 from src.eval.fast_downward import FDErrorInfo
 from src.eval.fast_downward import translate_pddl as _translate_pddl
 from src.eval.val import get_syntax_mistakes_domain as _get_syntax_mistakes_domain
 from src.eval.val import get_syntax_mistakes_problem as _get_syntax_mistakes_problem
-from src.inference import get_model_config
 from src.inference.model_comm import (
     make_prompt_with_trajectory,
     make_tool,
@@ -231,15 +227,6 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
         base_prompt = unformatted_base_prompt.format(tools=tools_json)
         input_prompt = base_prompt + input_prompt
 
-        model_config = get_model_config(self.model)
-        key_path = project_root / model_config.key_file
-        if not key_path.exists():
-            raise FileNotFoundError(f"API key file not found: {key_path}")
-        client = openai.OpenAI(
-            base_url=model_config.base_url,
-            api_key=open(str(key_path)).readline().strip(),
-        )
-
         res = None
         parsed_responses = []
         tool_results = []
@@ -256,8 +243,8 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
             )
             logger.debug(f"# Prompts with trajectory:\n{prompt_with_trajectory}")
             res = (
-                client.chat.completions.create(
-                    model=model_config.api_model_name,
+                self._openai_client.chat.completions.create(
+                    model=self._model_config.api_model_name,
                     messages=[
                         make_user_message(prompt_with_trajectory)
                         if image_paths is None
@@ -284,7 +271,6 @@ class ToolCallPipeline(ValAndPlannerFeedbackPipeline):
             parsed_responses.append(parsed_response)
             if parsed_response.tool_name == "finish":
                 break
-            # FIXME: This still happens quite often and does not trigger. Needs to be tested.
             if (
                 parsed_response.tool_name == past_tool_name
                 and parsed_response.tool_args == past_tool_args

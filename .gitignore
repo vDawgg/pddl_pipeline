@@ -225,3 +225,4 @@ results/*
 !results/.gitkeep
 logs/*
 !logs/.gitkeep
+charts/*
