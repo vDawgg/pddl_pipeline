@@ -25,7 +25,7 @@ class GenerateDomain(dspy.Signature):
         desc="Natural language description of the planning domain to model"
     )
     domain_pddl: str = dspy.OutputField(
-        desc="Complete PDDL domain file adhering to PDDL 2.1 standard"
+        desc="Complete PDDL domain file adhering to PDDL 1.0 standard"
     )
 
 
@@ -37,7 +37,7 @@ class GenerateProblem(dspy.Signature):
         desc="Natural language description of the specific problem instance"
     )
     problem_pddl: str = dspy.OutputField(
-        desc="Complete PDDL problem file adhering to PDDL 2.1 standard"
+        desc="Complete PDDL problem file adhering to PDDL 1.0 standard"
     )
 
 
