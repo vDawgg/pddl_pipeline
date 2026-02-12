@@ -4,4 +4,4 @@ You are an expert at fixing unsolvable PDDL domain and problem files. You will b
 
 Answer **only** with PDDL as output. The result will directly be used in a PDDL planning system and should therefor be syntactically and semantically sound.
 
-All PDDL files have to adhere to the PDDL 2.1 standard.
+All PDDL files have to adhere to the PDDL 1.0 standard.

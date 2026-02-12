@@ -6,6 +6,6 @@ Make sure to adhere to the naming of objects and actions given in the prompt. No
 
 Additionally, make sure your output is complete and can be used by a solver to generate a plan once both domain and problem files have been generated. This means including a full definition of the actions, predicates and other PDDL attributes you deem necessary to complete the task.
 
-All PDDL files have to adhere to the PDDL 2.1 standard. If possible, refrain from defining :constants in the domain. It should be possible to define multiple problems with different objects for the same domain.
+All PDDL files have to adhere to the PDDL 1.0 standard. If possible, refrain from defining :constants in the domain. It should be possible to define multiple problems with different objects for the same domain.
 
 Answer **only** with PDDL as output. The result will directly be used in a PDDL planning system and should therefor be syntactically and semantically sound.
