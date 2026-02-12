@@ -27,6 +27,15 @@ class Baseline(PipelineBase):
         self, model: Models, domain: Domains, pipeline: Pipelines | None = None
     ):
         super().__init__(model, domain, pipeline or Pipelines.BASELINE)
+        self._model_config = get_model_config(self.model)
+        key_path = project_root / self._model_config.key_file
+        if not key_path.exists():
+            raise FileNotFoundError(f"API key file not found: {key_path}")
+        api_key = key_path.read_text().strip().split("\n")[0]
+        self._openai_client = openai.OpenAI(
+            base_url=self._model_config.base_url,
+            api_key=api_key,
+        )
 
     def is_domain_valid(self, domain_file: Path) -> bool:
         err_info = get_syntax_mistakes_domain(domain_file)
@@ -63,24 +72,14 @@ class Baseline(PipelineBase):
         logger.debug("# User Message")
         logger.debug(input_prompt)
 
-        model_config = get_model_config(self.model)
-        key_path = project_root / model_config.key_file
-        if not key_path.exists():
-            raise FileNotFoundError(f"API key file not found: {key_path}")
-
-        client = openai.OpenAI(
-            base_url=model_config.base_url,
-            api_key=open(str(key_path)).readline().strip(),
-        )
-
         if img_paths:
             messages.append(make_user_message_with_image(input_prompt, img_paths))
         else:
             messages.append(make_user_message(input_prompt))
 
         if format:
-            response = client.beta.chat.completions.parse(
-                model=model_config.api_model_name,
+            response = self._openai_client.beta.chat.completions.parse(
+                model=self._model_config.api_model_name,
                 messages=messages,
                 response_format=format,
             )
@@ -88,8 +87,8 @@ class Baseline(PipelineBase):
             assert res
             return res, messages
         else:
-            response = client.chat.completions.create(
-                model=model_config.api_model_name,
+            response = self._openai_client.chat.completions.create(
+                model=self._model_config.api_model_name,
                 messages=messages,
                 service_tier="priority",
             )

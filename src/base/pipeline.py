@@ -169,6 +169,8 @@ class PipelineBase(ABC):
                 "../fast-downward-24.06.1/fast-downward.py",
                 "--overall-time-limit",
                 "1m",
+                "--overall-memory-limit",
+                "4G",
                 "--plan-file",
                 plan_file.name,
                 "--alias",

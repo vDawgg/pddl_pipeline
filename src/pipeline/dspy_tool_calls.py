@@ -6,7 +6,7 @@ import dspy
 from src.base.pipeline import CombinedMeta, FDErrorInfo, Pipelines
 from src.base.schema import PipelineError
 from src.constants import project_root
-from src.inference import Models, provider_hosts, provider_keys
+from src.inference import Models
 from src.pipeline.tool_calls import ToolCallPipeline
 from src.utils.domains import Domains
 from src.utils.prompts import Prompts, get_prompt
@@ -35,15 +35,14 @@ class DSPyToolCallPipeline(dspy.Module, ToolCallPipeline, metaclass=CombinedMeta
             self, model, domain, pipeline or Pipelines.DSPY_TOOL_CALL
         )
 
-        key_path = project_root / provider_keys[self.model]
+        key_path = project_root / self._model_config.key_file
         if not key_path.exists():
             raise FileNotFoundError(f"API key file not found: {key_path}")
-        api_key = open(str(key_path)).readline().strip()
-        base_url = provider_hosts[self.model]
+        api_key = key_path.read_text().strip().split("\n")[0]
         self.lm = dspy.LM(
-            model=f"openai/{self.model}",
+            model="openai/" + self._model_config.api_model_name,
             api_key=api_key,
-            api_base=base_url,
+            api_base=self._model_config.base_url,
             cache=False,  # Disable DSPy's built-in response caching
         )
         dspy.configure(lm=self.lm)
