@@ -1,0 +1,7 @@
+# Error message: Fast Downward could not find a plan.
+
+However, trying to remove the following predicates from the domain and problem lead to a plan being found. While removing these predicates might be in conflict with the actual underlying task, there could be problems in your current definition/usage of them. Please look at the task and your current PDDL implementations again and try to fix the files so that fast downward can generate a plan that is applicable to the task.
+
+## Predicates:
+
+(clear ?b), (on-table ?b)

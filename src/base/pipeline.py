@@ -1,12 +1,9 @@
 import logging
 import shutil
 import time
-import traceback
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, StrEnum, auto
 from pathlib import Path
-from subprocess import run
-from tempfile import NamedTemporaryFile
 from typing import TypeVar
 
 import dspy
@@ -16,7 +13,13 @@ from tqdm import tqdm
 
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
 from src.constants import generated_pddl_dir, logs_dir, plans_dir, results_dir
-from src.eval.fast_downward import ExitCodes, FDErrorInfo, exit_codes, parse_error
+from src.eval.fast_downward import (
+    ExitCodes,
+    FDErrorInfo,
+    UnsolvabilityFeedback,
+    generate_plan,
+    parse_error,
+)
 from src.inference import Models
 from src.utils.domains import Domains
 from src.utils.logger import add_file_handler, remove_file_handler
@@ -46,6 +49,9 @@ class Pipelines(StrEnum):
     TOOL_CALL_IMAGE = auto()
     TOOL_CALL_MULTI_AGENT = auto()
     DSPY_TOOL_CALL = auto()
+    DSPY_TOOL_CALL_CURATED = auto()
+    DSPY_TOOL_CALL_FULL = auto()
+    DSPY_TOOL_CALL_ABSTRACTION = auto()
 
 
 class PipelineBase(ABC):
@@ -113,7 +119,6 @@ class PipelineBase(ABC):
             self.elapsed_time = time.perf_counter() - start
             logger.debug("Caught exception while running inference:")
             logger.debug(e)
-            logger.debug(traceback.print_exc())
             result = self.create_result(error=PipelineError.MODEL_FAILURE)
         else:
             self.elapsed_time = time.perf_counter() - start
@@ -128,7 +133,13 @@ class PipelineBase(ABC):
 
     def run_eval(self, iterations: int) -> Path:
         results: list[PipelineResult] = []
-        for _ in tqdm(range(iterations), "Running Evaluation"):
+        # Prevent dspy from cluttering stdout when running in eval mode
+        dspy.disable_litellm_logging()
+        dspy.disable_logging()
+        for logger_name in ("dspy", "litellm", "LiteLLM"):
+            logging.getLogger(logger_name).setLevel(logging.ERROR)
+
+        for _ in tqdm(range(iterations), desc="Running Evaluation"):
             results.append(self.run())
         results_name = results_dir / f"{self.name}_{get_current_timestamp()}.csv"
 
@@ -161,36 +172,20 @@ class PipelineBase(ABC):
         self,
         domain_file: Path,
         problem_file: Path,
+        unsolvability_feedback: UnsolvabilityFeedback = UnsolvabilityFeedback.SIMPLE,
     ) -> FDErrorInfo | Path:
-        plan_file = NamedTemporaryFile(delete=False)
-        process = run(
-            [
-                "python",
-                "../fast-downward-24.06.1/fast-downward.py",
-                "--overall-time-limit",
-                "1m",
-                "--overall-memory-limit",
-                "4G",
-                "--plan-file",
-                plan_file.name,
-                "--alias",
-                "seq-sat-lama-2011",
-                domain_file,
-                problem_file,
-            ],
-            capture_output=True,
-            text=True,
-        )
-        fd_code = exit_codes[process.returncode]
+        plan_file, fd_code, output = generate_plan(domain_file, problem_file)
         if (
             fd_code == ExitCodes.SUCCESS
             or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY
             or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_TIME
             or fd_code == ExitCodes.SEARCH_PLAN_FOUND_AND_OUT_OF_MEMORY_AND_TIME
         ):
-            return self._save_plan(Path(plan_file.name))
+            return self._save_plan(plan_file)
         else:
-            return parse_error(fd_code, domain_file, problem_file)
+            return parse_error(
+                output, fd_code, domain_file, problem_file, unsolvability_feedback
+            )
 
     def _write_pddl_file(
         self,

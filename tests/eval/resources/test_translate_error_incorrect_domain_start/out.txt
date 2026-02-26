@@ -1,0 +1,2 @@
+# Error message: Domain definition expected to start with '(define '. Got '(:domain'
+# Affected file: domain

@@ -25,7 +25,6 @@ class GeneratePddlSignature(dspy.Signature):
     )
 
 
-# TODO: It might make sense to create a parent class for this as well.
 class DSPyToolCallPipeline(dspy.Module, ToolCallPipeline, metaclass=CombinedMeta):
     def __init__(
         self, model: Models, domain: Domains, pipeline: Pipelines | None = None
@@ -95,5 +94,6 @@ class DSPyToolCallPipeline(dspy.Module, ToolCallPipeline, metaclass=CombinedMeta
         # Log interaction history in one shot and clear everything after
         # to always get interactions from last run only
         logger.debug(self.lm.inspect_history())
+        self.num_model_calls = len(self.lm.history)
         self.lm.history.clear()
         return self.create_result(error=prediction.out)
