@@ -12,7 +12,7 @@ if __name__ == "__main__":
     env_iterations = os.environ.get("EVAL_ITERATIONS", 1)
     env_pipeline = os.environ.get("EVAL_PIPELINE", Pipelines.BASELINE.value)
     env_model = os.environ.get("EVAL_MODEL", Models.QWEN_3_VL_8B.value)
-    env_domain = os.environ.get("EVAL_DOMAIN", Domains.BLOCKSWORLD.value)
+    env_domain = os.environ.get("EVAL_DOMAIN", Domains.RING_AND_PEG.value)
 
     parser = ArgumentParser()
     parser.add_argument(

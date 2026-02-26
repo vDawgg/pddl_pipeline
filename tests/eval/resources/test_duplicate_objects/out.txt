@@ -1,0 +1,11 @@
+# Error message: Domain contains :constants referenced again in problem. Prefer object definition in problem only.error: duplicate object 'peg1'
+error: duplicate object 'peg2'
+error: duplicate object 'peg3'
+error: duplicate object 'peg4'
+error: duplicate object 'peg5'
+error: duplicate object 'ring-red'
+error: duplicate object 'ring-blue'
+error: duplicate object 'ring-green'
+error: duplicate object 'ring-yellow'
+error: duplicate object 'ring-purple'
+# Affected file: domain

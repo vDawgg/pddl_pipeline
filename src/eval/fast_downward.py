@@ -1,15 +1,16 @@
-"""
-The parsing code is partially based on the fastdownward parsers from the downward lab project
-https://github.com/aibasel/lab/tree/main/downward/parsers
-"""
-
 import logging
 import re
-from enum import StrEnum, auto
+from enum import Enum, StrEnum, auto
+from itertools import product
 from pathlib import Path
 from subprocess import run
 from tempfile import NamedTemporaryFile
 
+from pddl.core import Action, Domain, Formula, Problem
+from pddl.logic.base import And, BinaryOp, Not, QuantifiedCondition, UnaryOp
+from pddl.logic.predicates import DerivedPredicate, EqualTo, Predicate
+
+from pddl import parse_domain, parse_problem
 from src.base.schema import PDDLFiles, PipelineError
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,13 @@ def is_unsolvable(code: ExitCodes):
         code == ExitCodes.SEARCH_UNSOLVABLE
         or code == ExitCodes.SEARCH_UNSOLVED_INCOMPLETE
     )
+
+
+class UnsolvabilityFeedback(Enum):
+    SIMPLE = auto()
+    CURATED = auto()
+    FULL = auto()
+    ABSTRACTION = auto()
 
 
 exit_codes = {
@@ -109,7 +117,7 @@ class FDErrorInfo:
         base = f"# Error message: {self.error_message}\n"
         if self.file is None:
             return base
-        return base + "# Affected file: {self.file}\n"
+        return base + f"# Affected file: {self.file}\n"
 
     def to_pipeline_error(self) -> PipelineError:
         if is_translate_error(self.exit_code):
@@ -117,6 +125,230 @@ class FDErrorInfo:
         elif is_unsolvable(self.exit_code):
             return PipelineError.PLAN_FAILURE_UNSOLVABLE
         return PipelineError.PLAN_FAILURE
+
+
+class AbstractionGenerator:
+    """
+    This class is used to generate abstractions of a given PDDL task.
+    Abstraction in this case refers to removing a set of n fluents from the original task.
+    This can be useful for discerning what set of predicates might lead to the task not being solvable.
+
+    The basis for the generation of the abstracted tasks is:
+    Sreedharan, Sarath, et al. "Why Can't You Do That HAL? Explaining Unsolvability of Planning Tasks." IJCAI. 2019.
+    """
+
+    def __init__(self, domain_file: Path, problem_file: Path):
+        self.domain_file = domain_file
+        self.problem_file = problem_file
+        self.parsed_domain = parse_domain(self.domain_file)
+        self.parsed_problem = parse_problem(self.problem_file)
+
+    def generate_predicate_combinations(self) -> list[list[set[Predicate]]]:
+        """
+        Function used for generating all possible predicate combinations that can be
+        removed from a pddl domain and problem.
+        """
+        predicates = self.parsed_domain.predicates
+        # Iteratively build set of n predicate combinations used for later removal from domain
+        predicate_removals = []
+        for i in range(len(predicates)):
+            predicate_lists = [predicates for _ in range(i)]
+            unique_combinations = set()
+            for predicate_combinations in product(*predicate_lists):
+                # Remove all entries where fluents repeat
+                if len(predicate_combinations) == len(set(predicate_combinations)):
+                    unique_combinations.add(frozenset(predicate_combinations))
+            predicate_removals.append(
+                [sorted(set(combo)) for combo in unique_combinations if len(combo) > 0]
+            )
+        return predicate_removals
+
+    def build_abstraction(self) -> str | None:
+        """
+        Build abstracted domain and problems, where a set of predicates has been
+        removed and check whether removing these predicates makes the task solvable.
+        Returns the removed predicate set if the task was made solvable.
+        """
+        predicate_subsets = self.generate_predicate_combinations()
+        for predicate_group in predicate_subsets:
+            for predicates_to_remove in predicate_group:
+                removed_predicate_names = {
+                    predicate.name for predicate in predicates_to_remove
+                }
+                domain = self._build_domain(removed_predicate_names)
+                problem = self._build_problem(domain, removed_predicate_names)
+                domain_file = self._write_temp_pddl(str(domain))
+                problem_file = self._write_temp_pddl(str(problem))
+                _, fd_code, _ = generate_plan(domain_file, problem_file)
+                if fd_code == ExitCodes.SUCCESS:
+                    return ", ".join(
+                        sorted(str(predicate) for predicate in predicates_to_remove)
+                    )
+        return None
+
+    def _build_domain(self, removed_predicate_names: set[str]) -> Domain:
+        domain = self.parsed_domain
+        predicates = {
+            predicate
+            for predicate in domain.predicates
+            if predicate.name not in removed_predicate_names
+        }
+        actions = set()
+        for action in domain.actions:
+            precondition = self._filter_formula(
+                action.precondition, removed_predicate_names
+            )
+            effect = self._filter_formula(action.effect, removed_predicate_names)
+            # The PDDL lib cant handle None as a precondition.
+            # An empty And() is equivalent to an empty precondition here.
+            if precondition is None:
+                precondition = And()
+            if effect is None:
+                effect = And()
+            actions.add(
+                Action(
+                    name=action.name,
+                    parameters=action.parameters,
+                    precondition=precondition,
+                    effect=effect,
+                )
+            )
+        return Domain(
+            name=domain.name,
+            requirements=domain.requirements,
+            types=domain.types,  # type: ignore
+            constants=domain.constants,
+            predicates=predicates,
+            functions=domain.functions,
+            actions=actions,
+        )
+
+    def _build_problem(
+        self, domain: Domain, removed_predicate_names: set[str]
+    ) -> Problem:
+        problem = self.parsed_problem
+        init = {
+            filtered
+            for formula in problem.init
+            if (filtered := self._filter_formula(formula, removed_predicate_names))
+            is not None
+        }
+        goal = self._filter_formula(problem.goal, removed_predicate_names)
+        if goal is None:
+            goal = And()
+        return Problem(
+            name=problem.name,
+            domain=domain,
+            objects=problem.objects,
+            init=init,
+            goal=goal,
+            metric=problem.metric,
+        )
+
+    def _filter_formula(  # noqa: C901
+        self, formula: Formula | None, removed_predicate_names: set[str]
+    ) -> Formula | None:
+        # Predicates are clustered in formulas when defining e.g. preconditions for
+        # actions or the goal in a task in the pddl library. When removing predicates
+        # from the general predicate list in domains, we also have to make sure such
+        # predicates are no longer mentioned in the domains/problems formulas.
+        if formula is None:
+            return None
+        if isinstance(formula, Predicate):
+            return None if formula.name in removed_predicate_names else formula
+        if isinstance(formula, EqualTo):
+            return formula
+        if isinstance(formula, Not):
+            argument = self._filter_formula(formula.argument, removed_predicate_names)
+            if argument is None:
+                return None
+            return Not(argument)
+        if isinstance(formula, QuantifiedCondition):
+            condition = self._filter_formula(formula.condition, removed_predicate_names)
+            if condition is None:
+                return None
+            return type(formula)(condition, formula.variables)
+        if isinstance(formula, BinaryOp):
+            operands = [
+                self._filter_formula(operand, removed_predicate_names)
+                for operand in formula.operands
+            ]
+            filtered_operands = [operand for operand in operands if operand is not None]
+            if not filtered_operands:
+                return None
+            if len(filtered_operands) != len(formula.operands) and not isinstance(
+                formula, And
+            ):
+                return None
+            return type(formula)(*filtered_operands)
+        if isinstance(formula, UnaryOp):
+            argument = self._filter_formula(formula.argument, removed_predicate_names)
+            if argument is None:
+                return None
+            return type(formula)(argument)
+        return formula
+
+    def _write_temp_pddl(self, pddl_text: str) -> Path:
+        temp_file = NamedTemporaryFile(delete=False, mode="w", suffix=".pddl")
+        temp_file.write(pddl_text)
+        temp_file.flush()
+        temp_file.close()
+        return Path(temp_file.name)
+
+
+class UnsolvabilityParser:
+    def __init__(self):
+        self._compile_patterns()
+
+    def _compile_patterns(self):
+        self.no_relaxed_solution = re.compile(r"No relaxed solution")
+        self.trivially_false = re.compile(r"Trivially false goal")
+        self.simplified_trivially_false = re.compile(
+            r"Simplified to trivially false goal"
+        )
+        self.empty_goal = re.compile(r"Simplified to empty goal")
+        self.relevant_atoms = re.compile(r"(\d+) relevant atoms")
+        self.operators_removed = re.compile(r"(\d+) operators removed")
+        self.grounded_operators = re.compile(r"Translator operators: (\d+)")
+
+    def parse_unsolvability_hints(self, output: str, fd_code) -> FDErrorInfo:
+        err_message = [
+            "The task is unsolvable! Use the following error information to fix this.\n"
+        ]
+        if match := self.no_relaxed_solution.search(output):
+            err_message.append(
+                "The goal is not reachable by any action sequence. Check the preconditions and effects."
+            )
+        if match := self.trivially_false.search(output):
+            err_message.append(
+                "The goal contains a predicate that cannot be grounded. Check the goal predicates."
+            )
+        if match := self.simplified_trivially_false.search(output):
+            err_message.append(
+                "The goal contains a predicate that is never satisfied by any available action from the initial state. Check that all goal predicates are affected by at least one action from their init state."
+            )
+        if match := self.empty_goal.search(output):
+            err_message.append(
+                "The goal is empty and was either already satisfied in the initial state or was simplified away during planning. Check the goal conditions."
+            )
+        if match := self.relevant_atoms.search(output):
+            num_relevant_atoms = match.group(1)
+            # NOTE: If the number here is very strange it might be helpful to add the output generated from
+            #       dump_task thought this output might be very large depending on the task
+            err_message.append(
+                f"The domain contains {num_relevant_atoms} reachable grounded PDDL atoms. Verify that this number matches what you would expect."
+            )
+        if match := self.operators_removed.search(output):
+            num_removed_operators = match.group(1)
+            err_message.append(
+                f"The planner had to remove {num_removed_operators} actions from the set as they contain either impossible preconditions or no effects. Check the action preconditions and effects."
+            )
+        if match := self.grounded_operators.search(output):
+            num_grounded_operators = match.group(1)
+            err_message.append(
+                f"The planner generated {num_grounded_operators} actions that could be grounded. Verify that this number matches what you would expect."
+            )
+        return FDErrorInfo(fd_code, "\n".join(err_message))
 
 
 class TranslateParser:
@@ -268,6 +500,31 @@ class TranslateParser:
 
 
 translate_parser = TranslateParser()
+unsolvability_parser = UnsolvabilityParser()
+
+
+def generate_plan(domain_file: Path, problem_file: Path) -> tuple[Path, ExitCodes, str]:
+    plan_file = NamedTemporaryFile(delete=False)
+    process = run(
+        [
+            "python",
+            "../fast-downward-24.06.1/fast-downward.py",
+            "--overall-time-limit",
+            "1m",
+            "--overall-memory-limit",
+            "4G",
+            "--plan-file",
+            plan_file.name,
+            "--alias",
+            "seq-sat-lama-2011",
+            domain_file,
+            problem_file,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    fd_code = exit_codes[process.returncode]
+    return Path(plan_file.name), fd_code, process.stdout
 
 
 def translate_pddl(domain_file: Path, problem_file: Path) -> FDErrorInfo | None:
@@ -298,18 +555,49 @@ def translate_pddl(domain_file: Path, problem_file: Path) -> FDErrorInfo | None:
 
 
 def parse_error(
-    fd_code: ExitCodes, domain_file: Path, problem_file: Path
+    planner_output: str,
+    fd_code: ExitCodes,
+    domain_file: Path,
+    problem_file: Path,
+    unsolvability_feedback: UnsolvabilityFeedback = UnsolvabilityFeedback.SIMPLE,
 ) -> FDErrorInfo:
     if is_translate_error(fd_code):
-        # Run translator only on the same files to get better output
-        translate_output = translate_pddl(domain_file, problem_file)
-        assert translate_output is not None
-        return translate_output
+        return translate_parser.parse_translate_error(planner_output, fd_code)
+    # TODO: We should also incorporate this information when successfully generating a plan
+    #       as a last quality measure as well.
     elif is_unsolvable(fd_code):
-        return FDErrorInfo(
+        fallback = FDErrorInfo(
             fd_code,
             "Could not find a suitable plan",
         )
+        if unsolvability_feedback == UnsolvabilityFeedback.FULL:
+            return FDErrorInfo(
+                fd_code,
+                "Fast Downward could not find a plan. Following is the output from the planner\n\n"
+                + planner_output,
+            )
+        elif unsolvability_feedback == UnsolvabilityFeedback.CURATED:
+            return unsolvability_parser.parse_unsolvability_hints(
+                planner_output, fd_code
+            )
+        elif unsolvability_feedback == UnsolvabilityFeedback.ABSTRACTION:
+            predicates = AbstractionGenerator(
+                domain_file, problem_file
+            ).build_abstraction()
+            if predicates:
+                return FDErrorInfo(
+                    fd_code,
+                    "Fast Downward could not find a plan.\n\nHowever, trying to remove the following predicates from the domain and problem lead to a plan being found. "
+                    + "While removing these predicates might be in conflict with the actual underlying task, there could be problems in your current definition/usage of them. "
+                    + "Please look at the task and your current PDDL implementations again and try to fix the files so that fast downward can generate a plan that is applicable to the task.\n\n"
+                    + "## Predicates:\n\n"
+                    + predicates,
+                )
+            else:
+                return fallback
+        else:
+            return fallback
+    # Fall back which we should never really reach
     return FDErrorInfo(
         fd_code,
         "Fast Downward encountered an error while trying to generate a plan.",

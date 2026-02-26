@@ -1,7 +1,10 @@
+import difflib
+
 from src.base.schema import PDDLFiles
 from src.eval.fast_downward import (
     ExitCodes,
     FDErrorInfo,
+    UnsolvabilityFeedback,
 )
 from src.inference import Models
 from src.pipeline import Baseline
@@ -17,62 +20,90 @@ class TestFastDownward:
         )
 
     def test_translate_error_expected(self):
-        pddl_dir = eval_resource_dir / "test_translate_error_expected"
+        test_resources = eval_resource_dir / "test_translate_error_expected"
         error_info = self.pipeline._generate_plan(
-            pddl_dir / "domain.pddl",
-            pddl_dir / "problem.pddl",
+            test_resources / "domain.pddl",
+            test_resources / "problem.pddl",
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
-        print(error_info.error_message)
-        assert (
-            error_info.error_message
-            == "Expected a non-empty block starting with any of the following words: :requirements, :types, :constants, :predicates, :functions, :derived, :action\nGot: [':actions', ['pick-up', ':parameters', ['?x', '-', 'block'], ':precondition', ['and', ['on-table', '?x'], ['clear', '?x'], ['free-arm']], ':effect', ['and', ['not', ['on-table', '?x']], ['holding', '?x'], ['not', ['clear', '?x']], ['not', ['free-arm']], ['gripped', '?x']]], ['put-down', ':parameters', ['?x', '-', 'block'], ':precondition', ['and', ['holding', '?x'], ['clear', '?y'], ['not', ['attached', '?x']]], ':effect', ['and', ['not', ['holding', '?x']], ['on-table', '?x'], ['clear', '?y'], ['not', ['gripped', '?x']], ['free-arm']]], ['stack', ':parameters', ['?x', '-', 'block', '?y', '-', 'block'], ':precondition', ['and', ['holding', '?x'], ['on', '?y', '?z'], ['clear', '?y'], ['not', ['attached', '?x']]], ':effect', ['and', ['not', ['holding', '?x']], ['on', '?x', '?y'], ['clear', '?z'], ['not', ['gripped', '?x']], ['free-arm'], ['attached', '?x']]], ['unstack', ':parameters', ['?x', '-', 'block', '?y', '-', 'block'], ':precondition', ['and', ['on', '?x', '?y'], ['clear', '?x'], ['not', ['attached', '?x']]], ':effect', ['and', ['not', ['on', '?x', '?y']], ['on-table', '?x'], ['clear', '?y'], ['not', ['attached', '?x']], ['gripped', '?x'], ['free-arm']]]]"
-        )
+        with open(test_resources / "out.txt") as f:
+            assert error_info.to_str() == f.read()
 
     def test_translate_error_incorrect_domain_start(self):
-        pddl_dir = eval_resource_dir / "test_translate_error_incorrect_domain_start"
+        test_resources = (
+            eval_resource_dir / "test_translate_error_incorrect_domain_start"
+        )
         error_info = self.pipeline._generate_plan(
-            pddl_dir / "domain.pddl",
-            pddl_dir / "problem.pddl",
+            test_resources / "domain.pddl",
+            test_resources / "problem.pddl",
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
         assert error_info.file == PDDLFiles.DOMAIN
-        assert (
-            error_info.error_message
-            == "Domain definition expected to start with '(define '. Got '(:domain'"
-        )
+        with open(test_resources / "out.txt") as f:
+            assert error_info.to_str() == f.read()
 
     def test_duplicate_objects(self):
-        pddl_dir = eval_resource_dir / "test_duplicate_objects"
+        test_resources = eval_resource_dir / "test_duplicate_objects"
         error_info = self.pipeline._generate_plan(
-            pddl_dir / "domain.pddl",
-            pddl_dir / "problem.pddl",
+            test_resources / "domain.pddl",
+            test_resources / "problem.pddl",
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
         assert error_info.file == PDDLFiles.DOMAIN
-        assert (
-            error_info.error_message
-            == "Domain contains :constants referenced again in problem. Prefer object definition in problem only.error: duplicate object 'peg1'\n"
-            + "error: duplicate object 'peg2'\n"
-            + "error: duplicate object 'peg3'\n"
-            + "error: duplicate object 'peg4'\n"
-            + "error: duplicate object 'peg5'\n"
-            + "error: duplicate object 'ring-red'\n"
-            + "error: duplicate object 'ring-blue'\n"
-            + "error: duplicate object 'ring-green'\n"
-            + "error: duplicate object 'ring-yellow'\n"
-            + "error: duplicate object 'ring-purple'"
-        )
+        with open(test_resources / "out.txt") as f:
+            assert error_info.to_str() == f.read()
 
-    def test_search_unsolved(self):
-        pddl_dir = eval_resource_dir / "test_search_unsolved"
+    def test_search_unsolved_curated(self):
+        test_resources = eval_resource_dir / "test_search_unsolved_curated"
         error_info = self.pipeline._generate_plan(
-            pddl_dir / "domain.pddl",
-            pddl_dir / "problem.pddl",
+            test_resources / "domain.pddl",
+            test_resources / "problem.pddl",
+            UnsolvabilityFeedback.CURATED,
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.SEARCH_UNSOLVED_INCOMPLETE
-        assert error_info.error_message == "Could not find a suitable plan"
+        with open(test_resources / "out.txt") as f:
+            assert error_info.to_str() == f.read()
+
+    def test_search_unsolved_full(self):
+        test_resources = eval_resource_dir / "test_search_unsolved_full"
+        error_info = self.pipeline._generate_plan(
+            test_resources / "domain.pddl",
+            test_resources / "problem.pddl",
+            UnsolvabilityFeedback.FULL,
+        )
+        assert type(error_info) is FDErrorInfo
+        assert error_info.exit_code == ExitCodes.SEARCH_UNSOLVED_INCOMPLETE
+        with open(test_resources / "out.txt") as f:
+            # Stats and temp files will vary from run to run.
+            # Therefor doing best effort string matching.
+            assert (
+                difflib.SequenceMatcher(None, f.read(), error_info.to_str()).ratio()
+                >= 0.5
+            )
+
+    def test_search_unsolved_simple(self):
+        test_resources = eval_resource_dir / "test_search_unsolved_simple"
+        error_info = self.pipeline._generate_plan(
+            test_resources / "domain.pddl",
+            test_resources / "problem.pddl",
+        )
+        assert type(error_info) is FDErrorInfo
+        assert error_info.exit_code == ExitCodes.SEARCH_UNSOLVED_INCOMPLETE
+        with open(test_resources / "out.txt") as f:
+            assert error_info.to_str() == f.read()
+
+    def test_abstraction_generation(self):
+        test_resources = eval_resource_dir / "test_abstraction_generation"
+        error_info = self.pipeline._generate_plan(
+            test_resources / "domain.pddl",
+            test_resources / "problem.pddl",
+            UnsolvabilityFeedback.ABSTRACTION,
+        )
+        assert type(error_info) is FDErrorInfo
+        assert error_info.exit_code == ExitCodes.SEARCH_UNSOLVED_INCOMPLETE
+        with open(test_resources / "out.txt") as f:
+            assert error_info.to_str() == f.read()

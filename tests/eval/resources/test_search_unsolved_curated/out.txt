@@ -1,0 +1,5 @@
+# Error message: The task is unsolvable! Use the following error information to fix this.
+
+The goal is not reachable by any action sequence. Check the preconditions and effects.
+The domain contains 93 reachable grounded PDDL atoms. Verify that this number matches what you would expect.
+The planner generated 0 actions that could be grounded. Verify that this number matches what you would expect.
