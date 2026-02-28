@@ -39,6 +39,7 @@ class Models(StrEnum):
     QWEN_3_VL_8B = auto()
     QWEN_3_VL_235B = auto()
     QWEN_3_14B = auto()
+    QWEN_3_32B = auto()
     QWEN_25_CODER_14B = auto()
     GEMMA_3_12B = auto()
     QWEN_3_CODER = auto()
@@ -60,6 +61,10 @@ MODEL_CONFIGS: dict[Models, ModelConfig] = {
     Models.QWEN_3_14B: ModelConfig(
         api_model_name="qwen-3",
         provider=Provider.LOCAL,
+    ),
+    Models.QWEN_3_32B: ModelConfig(
+        api_model_name="qwen/qwen3-32b:nitro",
+        provider=Provider.OPENROUTER,
     ),
     Models.QWEN_25_CODER_14B: ModelConfig(
         api_model_name="qwen-2.5-coder",

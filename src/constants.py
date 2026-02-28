@@ -3,6 +3,8 @@ from pathlib import Path
 project_root = (Path(__file__) / ".." / "..").resolve()
 src_dir = project_root / "src"
 prompts_dir = project_root / "prompts"
+pddlgym_domain_prompts_dir = prompts_dir / "pddlgym_domains"
+pddlgym_problem_prompts_dir = prompts_dir / "pddlgym_problems"
 plans_dir = project_root / "plans"
 generated_pddl_dir = project_root / "pddl" / "generated"
 results_dir = project_root / "results"

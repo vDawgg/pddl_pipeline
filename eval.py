@@ -10,7 +10,7 @@ from src.utils.logger import configure_logging
 # TODO: For ease of use this should probably just be merged with main.py
 if __name__ == "__main__":
     env_iterations = os.environ.get("EVAL_ITERATIONS", 1)
-    env_pipeline = os.environ.get("EVAL_PIPELINE", Pipelines.BASELINE.value)
+    env_pipeline = os.environ.get("EVAL_PIPELINE", Pipelines.RIGID_TRAJECTORY.value)
     env_model = os.environ.get("EVAL_MODEL", Models.QWEN_3_VL_8B.value)
     env_domain = os.environ.get("EVAL_DOMAIN", Domains.RING_AND_PEG.value)
 
@@ -36,14 +36,22 @@ if __name__ == "__main__":
         default=env_domain,
         required=False,
     )
+    parser.add_argument(
+        "--optimize",
+        action="store_true",
+    )
     args = parser.parse_args()
     iterations = args.iterations
     pipeline = args.pipeline
     model = args.model
     domain = args.domain
+    optimize = args.optimize
 
     configure_logging(logging.INFO)
     logger = logging.getLogger(__name__)
 
-    results_file = pipelines[pipeline](model, domain).run_eval(iterations)
-    logger.info(f"# Saved results to {results_file}")
+    if optimize and pipeline in [Pipelines.TOOL_CALL, Pipelines.RIGID_TRAJECTORY]:
+        pipelines[pipeline](model, domain).compile_module()
+    else:
+        results_file = pipelines[pipeline](model, domain).run_eval(iterations)
+        logger.info(f"# Saved results to {results_file}")

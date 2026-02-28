@@ -3,7 +3,7 @@ FROM ghcr.io/astral-sh/uv:bookworm-slim AS val
 # VAL installation
 RUN apt update && apt upgrade -y
 RUN apt install cmake make g++ mingw-w64 flex bison git -y
-RUN git clone https://github.com/KCL-Planning/VAL
+RUN git clone https://github.com/vDawgg/VAL
 WORKDIR /VAL
 RUN chmod +x ./scripts/linux/build_linux64.sh
 RUN ./scripts/linux/build_linux64.sh Parser Release

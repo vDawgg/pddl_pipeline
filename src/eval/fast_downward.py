@@ -8,7 +8,7 @@ from tempfile import NamedTemporaryFile
 
 from pddl.core import Action, Domain, Formula, Problem
 from pddl.logic.base import And, BinaryOp, Not, QuantifiedCondition, UnaryOp
-from pddl.logic.predicates import DerivedPredicate, EqualTo, Predicate
+from pddl.logic.predicates import EqualTo, Predicate
 
 from pddl import parse_domain, parse_problem
 from src.base.schema import PDDLFiles, PipelineError
@@ -491,6 +491,7 @@ class TranslateParser:
                 continue
             in_error = True
             error_lines.append(stripped)
+        # FIXME: Hitting this again
         assert len(error_lines) > 0
         return FDErrorInfo(
             fd_code,
