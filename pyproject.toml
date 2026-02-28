@@ -9,6 +9,7 @@ dependencies = [
     "matplotlib>=3.10.8",
     "openai>=2.8.0",
     "pddl>=0.4.5",
+    "pddlgym>=0.0.6",
     "pillow>=12.1.0",
     "polars[rtcompat]>=1.38.1",
     "pre-commit>=4.4.0",

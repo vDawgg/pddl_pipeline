@@ -98,3 +98,24 @@ def get_syntax_mistakes_problem(domain_file: Path, problem_file: Path) -> VALErr
     with open(problem_file) as f:
         error_info = make_error_info(process.stdout, f.read().split("\n"), True)
     return error_info
+
+
+def is_domain_valid(domain_file: Path) -> bool:
+    err_info = get_syntax_mistakes_domain(domain_file)
+    if err_info.num_errors > 0:
+        logger.debug("Failed to create a syntactically valid domain")
+        return False
+    logger.debug("Generated syntactically valid domain")
+    return True
+
+
+def is_problem_valid(
+    domain_file: Path,
+    problem_file: Path,
+) -> bool:
+    err_info = get_syntax_mistakes_problem(domain_file, problem_file)
+    if err_info.num_errors > 0:
+        logger.debug("Failed to create a syntactically valid problem")
+        return False
+    logger.debug("Generated syntactically valid problem")
+    return True

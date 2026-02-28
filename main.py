@@ -11,7 +11,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pipeline",
         choices=[pipeline.value for pipeline in Pipelines],
-        default=Pipelines.BASELINE,
+        default=Pipelines.RIGID_TRAJECTORY,
         required=False,
     )
     parser.add_argument(

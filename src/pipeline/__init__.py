@@ -1,30 +1,18 @@
 from src.base.pipeline import Pipelines
-from src.pipeline.baseline import Baseline
-from src.pipeline.dspy_tool_call_abstraction import DSPyToolCallPipelineAbstraction
-from src.pipeline.dspy_tool_call_curated import DSPyToolCallPipelineCurated
-from src.pipeline.dspy_tool_call_full import DSPyToolCallPipelineFull
-from src.pipeline.dspy_tool_calls import DSPyToolCallPipeline
-from src.pipeline.dspy_val_and_planner_feedback import DSPyValAndPlannerFeedbackPipeline
-from src.pipeline.tool_calls import ToolCallPipeline
-from src.pipeline.tool_calls_image import ToolCallImagePipeline
-from src.pipeline.tool_calls_multi_agent import ToolCallPipelineMutltiAgent
-from src.pipeline.val_and_planner_feedback import ValAndPlannerFeedbackPipeline
-from src.pipeline.val_and_planner_feedback_image import (
-    ValAndPLannerFeedbackImagePipeline,
-)
-from src.pipeline.val_feedback import ValFeedbackPipeline
+from src.pipeline.rigid_trajectory import RigidTrajectoryPipeline
+from src.pipeline.rigid_trajectory_image import RigidTrajectoryImagePipeline
+from src.pipeline.tool_call import ToolCallPipeline
+from src.pipeline.tool_call_abstraction import DSPyToolCallPipelineAbstraction
+from src.pipeline.tool_call_curated import DSPyToolCallPipelineCurated
+from src.pipeline.tool_call_full import DSPyToolCallPipelineFull
+from src.pipeline.tool_call_image import ToolCallImagePipeline
 
 pipelines = {
-    Pipelines.BASELINE: Baseline,
-    Pipelines.VAL_FEEDBACK: ValFeedbackPipeline,
-    Pipelines.VAL_AND_PLANNER_FEEDBACK: ValAndPlannerFeedbackPipeline,
-    Pipelines.VAL_AND_PLANNER_FEEDBACK_IMAGE: ValAndPLannerFeedbackImagePipeline,
-    Pipelines.DSPY_VAL_AND_PLANNER_FEEDBACK: DSPyValAndPlannerFeedbackPipeline,
+    Pipelines.RIGID_TRAJECTORY: RigidTrajectoryPipeline,
+    Pipelines.RIGID_TRAJECTORY_IMAGE: RigidTrajectoryImagePipeline,
     Pipelines.TOOL_CALL: ToolCallPipeline,
     Pipelines.TOOL_CALL_IMAGE: ToolCallImagePipeline,
-    Pipelines.TOOL_CALL_MULTI_AGENT: ToolCallPipelineMutltiAgent,
-    Pipelines.DSPY_TOOL_CALL: DSPyToolCallPipeline,
-    Pipelines.DSPY_TOOL_CALL_CURATED: DSPyToolCallPipelineCurated,
-    Pipelines.DSPY_TOOL_CALL_FULL: DSPyToolCallPipelineFull,
-    Pipelines.DSPY_TOOL_CALL_ABSTRACTION: DSPyToolCallPipelineAbstraction,
+    Pipelines.TOOL_CALL_ABSTRACTION: DSPyToolCallPipelineAbstraction,
+    Pipelines.TOOL_CALL_CURATED: DSPyToolCallPipelineCurated,
+    Pipelines.TOOL_CALL_FULL: DSPyToolCallPipelineFull,
 }

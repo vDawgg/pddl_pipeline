@@ -1,0 +1,3 @@
+## Problem description
+
+There are 15 rooms (room0 - room14) and 25 balls (ball0 - ball24). The robot has two grippers (gripper0, gripper1). The robot starts out in room0. Following are the rooms initially non-empty rules and the balls they contain given in parantheses: room1 (ball11), room2 (ball10, ball13, ball21, ball22), room3 (ball7), room5 (ball17), room7 (ball2, ball5), room8 (ball18, ball19, ball20), room9 (ball16), room10 (ball3, ball8, ball23), room11 (ball12, ball15, ball24), room12 (ball0), room13 (ball1, ball9), room14 (ball4, ball6, ball14). The goal is to rearrange the balls across the rooms, so that the following rooms at least contain the balls given in parantheses: room0 (ball5), room3 (ball9).

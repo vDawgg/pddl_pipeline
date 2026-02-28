@@ -1,10 +1,13 @@
+import copy
 import logging
 import shutil
+import threading
 import time
-from abc import ABC, ABCMeta, abstractmethod
+from abc import abstractmethod
 from enum import Enum, StrEnum, auto
 from pathlib import Path
 from typing import TypeVar
+from uuid import uuid4
 
 import dspy
 import polars as pl
@@ -12,7 +15,13 @@ from pydantic import BaseModel
 from tqdm import tqdm
 
 from src.base.schema import PDDLFiles, PipelineError, PipelineResult
-from src.constants import generated_pddl_dir, logs_dir, plans_dir, results_dir
+from src.constants import (
+    generated_pddl_dir,
+    logs_dir,
+    plans_dir,
+    project_root,
+    results_dir,
+)
 from src.eval.fast_downward import (
     ExitCodes,
     FDErrorInfo,
@@ -20,9 +29,10 @@ from src.eval.fast_downward import (
     generate_plan,
     parse_error,
 )
-from src.inference import Models
+from src.inference import Models, get_model_config
 from src.utils.domains import Domains
 from src.utils.logger import add_file_handler, remove_file_handler
+from src.utils.pddlgym_utils import goal_reached, make_ds
 from src.utils.timestamp import get_current_timestamp
 
 logger = logging.getLogger(__name__)
@@ -30,39 +40,37 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
-_ProgramMeta = type(dspy.Module)
-
-
-class CombinedMeta(_ProgramMeta, ABCMeta):
-    """Metaclass combining dspy's ProgramMeta with ABCMeta for multiple inheritance."""
-
-    ...
-
-
 class Pipelines(StrEnum):
-    BASELINE = auto()
-    VAL_FEEDBACK = auto()
-    VAL_AND_PLANNER_FEEDBACK = auto()
-    VAL_AND_PLANNER_FEEDBACK_IMAGE = auto()
-    DSPY_VAL_AND_PLANNER_FEEDBACK = auto()
     TOOL_CALL = auto()
+    TOOL_CALL_ABSTRACTION = auto()
+    TOOL_CALL_CURATED = auto()
+    TOOL_CALL_FULL = auto()
     TOOL_CALL_IMAGE = auto()
-    TOOL_CALL_MULTI_AGENT = auto()
-    DSPY_TOOL_CALL = auto()
-    DSPY_TOOL_CALL_CURATED = auto()
-    DSPY_TOOL_CALL_FULL = auto()
-    DSPY_TOOL_CALL_ABSTRACTION = auto()
+    RIGID_TRAJECTORY = auto()
+    RIGID_TRAJECTORY_IMAGE = auto()
 
 
-class PipelineBase(ABC):
-    def __init__(
-        self, model: Models, domain: Domains, pipeline: Pipelines | None = None
-    ):
-        self.model = model
-        # TODO: Just add these prompts according to the domain to this class. The dicts are too much.
-        self.domain = domain
-        self.pipeline = pipeline
-        self.name = f"{self.domain}_{self.pipeline}_{self.model.split('/')[-1]}"
+class ThreadSafeClassVars(threading.local):
+    """
+    Thread safe wrapper for class vars to keep track of the pipeline runs
+    metrics and results. Needed, as dspy modules parallelization approach
+    assumes pure functions and we cannot depend on that.
+    """
+
+    def __deepcopy__(self, memo):
+        new = ThreadSafeClassVars()
+        memo[id(self)] = new
+        for key, value in self.__dict__.items():
+            setattr(new, key, copy.deepcopy(value, memo))
+        return new
+
+    def __copy__(self):
+        new = ThreadSafeClassVars()
+        for key, value in self.__dict__.items():
+            setattr(new, key, value)
+        return new
+
+    def __init__(self):
         self.elapsed_time: float = 0.0
         self.num_model_calls: int = 0
         self.create_pddl_file_calls = 0
@@ -77,29 +85,7 @@ class PipelineBase(ABC):
         self.plan_file: Path | None = None
         self.log_file: Path | None = None
 
-    def create_result(
-        self,
-        error: PipelineError | None = None,
-    ) -> PipelineResult:
-        return PipelineResult(
-            model=self.model,
-            elapsed_time=self.elapsed_time,
-            num_model_calls=self.num_model_calls,
-            error=error,
-            domain_file=self.domain_file,
-            problem_file=self.problem_file,
-            plan_file=self.plan_file,
-            log_file=self.log_file,
-            create_pddl_file_calls=self.create_pddl_file_calls,
-            read_pddl_file_calls=self.read_pddl_file_calls,
-            edit_lines_calls=self.edit_lines_calls,
-            domain_syntax_errors_calls=self.domain_syntax_errors_calls,
-            problem_syntax_mistakes_calls=self.problem_syntax_mistakes_calls,
-            translate_pddl_calls=self.translate_pddl_calls,
-            generate_plan_calls=self.generate_plan_calls,
-        )
-
-    def run(self) -> PipelineResult:
+    def reset(self, name: str):
         self.num_model_calls = 0
         self.create_pddl_file_calls = 0
         self.read_pddl_file_calls = 0
@@ -110,8 +96,61 @@ class PipelineBase(ABC):
         self.domain_file = None
         self.problem_file = None
         self.plan_file = None
-        self.log_file = logs_dir / f"{self.name}_{get_current_timestamp()}.log"
-        file_handler = add_file_handler(self.log_file)
+        self.log_file = logs_dir / f"{name}_{get_current_timestamp()}_{uuid4().hex}.log"
+
+
+class PipelineBase(dspy.Module):
+    def __init__(
+        self, model: Models, domain: Domains, pipeline: Pipelines | None = None
+    ):
+        self.model = model
+        # TODO: Just add these prompts according to the domain to this class. The dicts are too much.
+        self.domain = domain
+        self.pipeline = pipeline
+        self.name = f"{self.domain}_{self.pipeline}_{self.model.split('/')[-1]}"
+        self.vars = ThreadSafeClassVars()
+
+        self._model_config = get_model_config(self.model)
+        key_path = project_root / self._model_config.key_file
+        if not key_path.exists():
+            raise FileNotFoundError(f"API key file not found: {key_path}")
+        api_key = key_path.read_text().strip().split("\n")[0]
+        self.lm = dspy.LM(
+            model="openai/" + self._model_config.api_model_name,
+            api_key=api_key,
+            api_base=self._model_config.base_url,
+            cache=False,  # Disable DSPy's built-in response caching
+        )
+        dspy.configure(lm=self.lm)
+
+    ## PIPELINE RUN LOGIC
+
+    def create_result(
+        self,
+        error: PipelineError | None = None,
+    ) -> PipelineResult:
+        return PipelineResult(
+            model=self.model,
+            elapsed_time=self.vars.elapsed_time,
+            num_model_calls=self.vars.num_model_calls,
+            error=error,
+            domain_file=self.vars.domain_file,
+            problem_file=self.vars.problem_file,
+            plan_file=self.vars.plan_file,
+            log_file=self.vars.log_file,
+            create_pddl_file_calls=self.vars.create_pddl_file_calls,
+            read_pddl_file_calls=self.vars.read_pddl_file_calls,
+            edit_lines_calls=self.vars.edit_lines_calls,
+            domain_syntax_errors_calls=self.vars.domain_syntax_errors_calls,
+            problem_syntax_mistakes_calls=self.vars.problem_syntax_mistakes_calls,
+            translate_pddl_calls=self.vars.translate_pddl_calls,
+            generate_plan_calls=self.vars.generate_plan_calls,
+        )
+
+    def run(self) -> PipelineResult:
+        self.vars.reset(self.name)
+        assert self.vars.log_file is not None
+        file_handler = add_file_handler(self.vars.log_file)
         start = time.perf_counter()
         try:
             result = self._run_impl()
@@ -121,10 +160,10 @@ class PipelineBase(ABC):
             logger.debug(e)
             result = self.create_result(error=PipelineError.MODEL_FAILURE)
         else:
-            self.elapsed_time = time.perf_counter() - start
+            self.vars.elapsed_time = time.perf_counter() - start
         finally:
             remove_file_handler(file_handler)
-        result.elapsed_time = self.elapsed_time
+        result.elapsed_time = self.vars.elapsed_time
         return result
 
     @abstractmethod
@@ -141,7 +180,9 @@ class PipelineBase(ABC):
 
         for _ in tqdm(range(iterations), desc="Running Evaluation"):
             results.append(self.run())
-        results_name = results_dir / f"{self.name}_{get_current_timestamp()}.csv"
+        results_name = (
+            results_dir / f"{self.name}_{get_current_timestamp()}_{uuid4().hex}.csv"
+        )
 
         def serialize_value(v):
             if isinstance(v, Enum):
@@ -156,6 +197,96 @@ class PipelineBase(ABC):
         ).write_csv(results_name)
         return results_name
 
+    ## PIPELINE OPTIMIZATION FUNCTIONS
+
+    def _pddl_generation_metric(
+        self,
+        example: dspy.Example,
+        pred: dspy.Prediction,
+        trace=None,
+        pred_name=None,
+        pred_trace=None,
+    ) -> float:
+        """Evaluation metric for usage with DSPy optimizers. Tries to optimize for incremental success."""
+        pred_error: PipelineError | None = pred.out
+        if pred_error == PipelineError.PLAN_FAILURE_TRANSLATE:
+            return 0.25
+        elif pred_error == PipelineError.PLAN_FAILURE_UNSOLVABLE:
+            return 0.5
+        elif pred_error is None:
+            # We cannot use the class instances plan files here, as this metric function
+            # is not multi-threaded and therefor only has the vars instance of the original
+            # class instance.
+            assert pred.plan_file is not None
+            planning_success = goal_reached(
+                example.domain_name,
+                example.problem_index,
+                pred.plan_file,
+            )
+            if planning_success:
+                return 1.0
+            else:
+                return 0.75
+        return 0.0
+
+    def _compile_module(self, separate_prompts: bool = False):
+        log_file = logs_dir / f"{self.name}_optimization_{get_current_timestamp()}.log"
+        file_handler = add_file_handler(log_file)
+        start = time.perf_counter()
+        logger.info(f"Starting optimization for {self.name}")
+
+        reflection_config = get_model_config(Models.GPT_52)
+        key_path = project_root / reflection_config.key_file
+        if not key_path.exists():
+            raise FileNotFoundError(f"API key file not found: {key_path}")
+        api_key = key_path.read_text().strip().split("\n")[0]
+
+        teleprompter = dspy.GEPA(
+            max_full_evals=2,
+            metric=self._pddl_generation_metric,
+            num_threads=10,
+            reflection_lm=dspy.LM(
+                model="openai/gpt-5.2",
+                api_key=api_key,
+                api_base=reflection_config.base_url,
+                temperature=1.0,
+                cache=False,
+            ),
+        )
+
+        trainset, valset = make_ds(separate_prompts=separate_prompts)
+        optimized_program = teleprompter.compile(
+            self,
+            trainset=trainset,
+            valset=valset,
+        )
+
+        program_name = f"optimized_{self.pipeline}_{self.model}.json"
+        optimized_program.save(program_name)
+        elapsed_time = time.perf_counter() - start
+        logger.info(
+            f"Saved optimized program under {program_name} (took {elapsed_time:.2f}s)"
+        )
+
+        # Shut down litellm's background logging executor gracefully to avoid
+        # "cannot schedule new futures after shutdown" after optimization is done
+        try:
+            from litellm.litellm_core_utils.thread_pool_executor import (
+                executor as litellm_executor,
+            )
+
+            litellm_executor.shutdown(wait=True)
+        except Exception:
+            pass
+
+        remove_file_handler(file_handler)
+
+    @abstractmethod
+    def compile_module(self):
+        pass
+
+    ## FASTDOWNWARD CLASS UTILITIES
+
     def _save_plan(self, plan_file: Path) -> Path:
         latest_plan = ""
         for i in range(1, 100):
@@ -164,7 +295,9 @@ class PipelineBase(ABC):
                 latest_plan = candidate_path
             else:
                 break
-        plan_name = plans_dir / f"{self.name}_{get_current_timestamp()}.plan"
+        plan_name = (
+            plans_dir / f"{self.name}_{get_current_timestamp()}_{uuid4().hex}.plan"
+        )
         shutil.copyfile(latest_plan, plan_name)
         return plan_name
 
@@ -187,6 +320,8 @@ class PipelineBase(ABC):
                 output, fd_code, domain_file, problem_file, unsolvability_feedback
             )
 
+    ## PDDL I/O
+
     def _write_pddl_file(
         self,
         pddl: str,
@@ -196,7 +331,7 @@ class PipelineBase(ABC):
         file_path = (
             file
             or generated_pddl_dir
-            / f"{self.domain}_{pddl_file_type}_{self.name}_{get_current_timestamp()}.pddl"
+            / f"{self.domain}_{pddl_file_type}_{self.name}_{get_current_timestamp()}_{uuid4().hex}.pddl"
         )
         with open(file_path, "w") as f:
             f.write(pddl)
@@ -205,3 +340,55 @@ class PipelineBase(ABC):
     def _read_pddl_file(self, pddl_file: Path) -> str:
         with open(pddl_file) as f:
             return f.read()
+
+    ## GENERAL UTIL
+
+    def print_and_clear_history(self):  # noqa: C901
+        """
+        Log interaction history in one shot and clear everything after to always get interactions from last run only
+        """
+        # Code below adapted from pretty_print_history from dspy
+        item = self.history[-1]
+        messages = item["messages"] or [{"role": "user", "content": item["prompt"]}]
+        outputs = item["outputs"]
+        for msg in messages:
+            logger.debug(f"{msg['role'].capitalize()} message:")
+            if isinstance(msg["content"], str):
+                logger.debug(msg["content"].strip())
+            else:
+                if isinstance(msg["content"], list):
+                    for c in msg["content"]:
+                        if c["type"] == "text":
+                            logger.debug(c["text"].strip())
+                        elif c["type"] == "image_url":
+                            image_str = ""
+                            if "base64" in c["image_url"].get("url", ""):
+                                len_base64 = len(
+                                    c["image_url"]["url"].split("base64,")[1]
+                                )
+                                image_str = (
+                                    f"<{c['image_url']['url'].split('base64,')[0]}base64,"
+                                    f"<IMAGE BASE 64 ENCODED({len_base64!s})>"
+                                )
+                            else:
+                                image_str = f"<image_url: {c['image_url']['url']}>"
+                            logger.debug(image_str.strip())
+        if isinstance(outputs[0], dict):
+            if outputs[0]["text"]:
+                logger.debug("Response:")
+                logger.debug(outputs[0]["text"].strip())
+
+            if outputs[0].get("tool_calls"):
+                logger.debug("Tool calls:")
+                for tool_call in outputs[0]["tool_calls"]:
+                    logger.debug(
+                        f"{tool_call['function']['name']}: {tool_call['function']['arguments']}"
+                    )
+        else:
+            logger.debug("Response:")
+            logger.debug(outputs[0].strip())
+
+        if len(outputs) > 1:
+            choices_text = f" \t (and {len(outputs) - 1} other completions)"
+            logger.debug(choices_text)
+        self.lm.history.clear()

@@ -1,0 +1,3 @@
+## Problem description
+
+There is 1 depot (depot0), 2 distributors (distibutor0, distributor1), 2 trucks (truck0, truck1), 6 pallets (palet0 - pallet5), 6 crates (crate0 - crate5) and 3 hoitsts (hoist0 - hoist2). pallet0 is at depot0, pallet1, pallet3 and pallet4 at distributor0 and pallet2 and pallet5 at distributor1. crate0 is on pallet4, crate1 on pallet5, crate2 on pallet2, crate3 is on crate2, crate4 on crate0 and crate5 on pallet0. truck0 is at distributor1 and truck1 is at depot0. hoist0 is at depot0, hoist1 at distributor0 and hoist2 at distributor1. The goal is to transfer crate0 on pallet3, crate1 on crate4, crate3 on pallet1, crate4 on pallet5 and crate5 on crate1.

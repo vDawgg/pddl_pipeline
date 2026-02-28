@@ -1,5 +1,6 @@
 import difflib
 
+from src.base.pipeline import PipelineBase
 from src.base.schema import PDDLFiles
 from src.eval.fast_downward import (
     ExitCodes,
@@ -7,14 +8,13 @@ from src.eval.fast_downward import (
     UnsolvabilityFeedback,
 )
 from src.inference import Models
-from src.pipeline import Baseline
 from src.utils.domains import Domains
 from tests.constants import eval_resource_dir
 
 
 class TestFastDownward:
     def setup_method(self):
-        self.pipeline = Baseline(
+        self.pipeline = PipelineBase(
             model=Models.GEMMA_3_12B,
             domain=Domains.RING_AND_PEG,
         )
