@@ -32,9 +32,15 @@ class GeneratePddlSignature(dspy.Signature):
 
 class ToolCallPipeline(PipelineBase):
     def __init__(
-        self, model: Models, domain: Domains, pipeline: Pipelines | None = None
+        self,
+        model: Models,
+        domain: Domains,
+        pipeline: Pipelines | None = None,
+        optimized_program: str | None = None,
     ):
-        super().__init__(model, domain, pipeline or Pipelines.TOOL_CALL)
+        super().__init__(
+            model, domain, pipeline or Pipelines.TOOL_CALL, optimized_program
+        )
         self.generate_pddl_module = dspy.ReAct(
             GeneratePddlSignature,
             tools=[
@@ -48,6 +54,8 @@ class ToolCallPipeline(PipelineBase):
             ],
             max_iters=20,
         )
+        if optimized_program is not None:
+            self.load(optimized_program)
 
     ## TOOLS
 

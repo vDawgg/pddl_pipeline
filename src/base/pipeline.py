@@ -101,13 +101,17 @@ class ThreadSafeClassVars(threading.local):
 
 class PipelineBase(dspy.Module):
     def __init__(
-        self, model: Models, domain: Domains, pipeline: Pipelines | None = None
+        self,
+        model: Models,
+        domain: Domains,
+        pipeline: Pipelines | None = None,
+        optimized_program: str | None = None,
     ):
         self.model = model
         # TODO: Just add these prompts according to the domain to this class. The dicts are too much.
         self.domain = domain
         self.pipeline = pipeline
-        self.name = f"{self.domain}_{self.pipeline}_{self.model.split('/')[-1]}"
+        self.name = f"{self.domain}_{self.pipeline}_{self.model.split('/')[-1]}_base"
         self.vars = ThreadSafeClassVars()
 
         self._model_config = get_model_config(self.model)
@@ -122,6 +126,11 @@ class PipelineBase(dspy.Module):
             cache=False,  # Disable DSPy's built-in response caching
         )
         dspy.configure(lm=self.lm)
+        if optimized_program is not None:
+            assert Path(optimized_program).exists(), (
+                "Path to optimized program does not exist"
+            )
+            self.name = f"{self.domain}_{self.pipeline}_{self.model.split('/')[-1]}_{Path(optimized_program).name}"
 
     ## PIPELINE RUN LOGIC
 
@@ -242,9 +251,10 @@ class PipelineBase(dspy.Module):
         api_key = key_path.read_text().strip().split("\n")[0]
 
         teleprompter = dspy.GEPA(
-            max_full_evals=2,
+            max_full_evals=4,
             metric=self._pddl_generation_metric,
             num_threads=10,
+            reflection_minibatch_size=10,
             reflection_lm=dspy.LM(
                 model="openai/gpt-5.2",
                 api_key=api_key,
@@ -288,13 +298,17 @@ class PipelineBase(dspy.Module):
     ## FASTDOWNWARD CLASS UTILITIES
 
     def _save_plan(self, plan_file: Path) -> Path:
-        latest_plan = ""
+        latest_plan = None
         for i in range(1, 100):
             candidate_path = Path(f"{plan_file}.{i}")
             if candidate_path.is_file():
                 latest_plan = candidate_path
             else:
                 break
+        if latest_plan is None:
+            raise FileNotFoundError(
+                f"Fast Downward reported success but no plan file found at {plan_file}.* "
+            )
         plan_name = (
             plans_dir / f"{self.name}_{get_current_timestamp()}_{uuid4().hex}.plan"
         )
