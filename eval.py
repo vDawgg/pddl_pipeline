@@ -40,12 +40,17 @@ if __name__ == "__main__":
         "--optimize",
         action="store_true",
     )
+    parser.add_argument(
+        "--optimized_program",
+        required=False,
+    )
     args = parser.parse_args()
     iterations = args.iterations
     pipeline = args.pipeline
     model = args.model
     domain = args.domain
     optimize = args.optimize
+    optimized_program = args.optimized_program
 
     configure_logging(logging.INFO)
     logger = logging.getLogger(__name__)
@@ -53,5 +58,8 @@ if __name__ == "__main__":
     if optimize and pipeline in [Pipelines.TOOL_CALL, Pipelines.RIGID_TRAJECTORY]:
         pipelines[pipeline](model, domain).compile_module()
     else:
-        results_file = pipelines[pipeline](model, domain).run_eval(iterations)
+        logger.info(optimized_program)
+        results_file = pipelines[pipeline](
+            model, domain, optimized_program=optimized_program
+        ).run_eval(iterations)
         logger.info(f"# Saved results to {results_file}")
