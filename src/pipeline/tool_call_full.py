@@ -2,7 +2,7 @@ from pathlib import Path
 
 import dspy
 
-from src.base.pipeline import Pipelines
+from src.base.schema import Pipelines
 from src.constants import project_root
 from src.eval.fast_downward import FDErrorInfo, UnsolvabilityFeedback
 from src.inference import Models
@@ -39,7 +39,7 @@ class DSPyToolCallPipelineFull(ToolCallPipeline):
     ):
         dspy.Module.__init__(self)
         ToolCallPipeline.__init__(
-            self, model, domain, pipeline or Pipelines.TOOL_CALL_FULL
+            self, model, domain, pipeline=pipeline or Pipelines.TOOL_CALL_FULL
         )
 
         key_path = project_root / self._model_config.key_file

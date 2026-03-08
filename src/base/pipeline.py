@@ -4,7 +4,7 @@ import shutil
 import threading
 import time
 from abc import abstractmethod
-from enum import Enum, StrEnum, auto
+from enum import Enum
 from pathlib import Path
 from typing import TypeVar
 from uuid import uuid4
@@ -14,7 +14,7 @@ import polars as pl
 from pydantic import BaseModel
 from tqdm import tqdm
 
-from src.base.schema import PDDLFiles, PipelineError, PipelineResult
+from src.base.schema import PDDLFiles, PipelineError, PipelineResult, Pipelines, Tools
 from src.constants import (
     generated_pddl_dir,
     logs_dir,
@@ -38,16 +38,6 @@ from src.utils.timestamp import get_current_timestamp
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
-
-
-class Pipelines(StrEnum):
-    TOOL_CALL = auto()
-    TOOL_CALL_ABSTRACTION = auto()
-    TOOL_CALL_CURATED = auto()
-    TOOL_CALL_FULL = auto()
-    TOOL_CALL_IMAGE = auto()
-    RIGID_TRAJECTORY = auto()
-    RIGID_TRAJECTORY_IMAGE = auto()
 
 
 class ThreadSafeClassVars(threading.local):
@@ -80,6 +70,9 @@ class ThreadSafeClassVars(threading.local):
         self.problem_syntax_mistakes_calls = 0
         self.translate_pddl_calls = 0
         self.generate_plan_calls = 0
+        self.get_plan_feedback_calls = 0
+        self.input_tokens = 0
+        self.output_tokens = 0
         self.domain_file: Path | None = None
         self.problem_file: Path | None = None
         self.plan_file: Path | None = None
@@ -93,6 +86,9 @@ class ThreadSafeClassVars(threading.local):
         self.domain_syntax_errors_calls = 0
         self.problem_syntax_mistakes_calls = 0
         self.generate_plan_calls = 0
+        self.get_plan_feedback_calls = 0
+        self.input_tokens = 0
+        self.output_tokens = 0
         self.domain_file = None
         self.problem_file = None
         self.plan_file = None
@@ -104,6 +100,7 @@ class PipelineBase(dspy.Module):
         self,
         model: Models,
         domain: Domains,
+        ablate_tools: list[Tools] | None = None,
         pipeline: Pipelines | None = None,
         optimized_program: str | None = None,
     ):
@@ -113,6 +110,7 @@ class PipelineBase(dspy.Module):
         self.pipeline = pipeline
         self.name = f"{self.domain}_{self.pipeline}_{self.model.split('/')[-1]}_base"
         self.vars = ThreadSafeClassVars()
+        self.ablate_tools = ablate_tools
 
         self._model_config = get_model_config(self.model)
         key_path = project_root / self._model_config.key_file
@@ -125,7 +123,7 @@ class PipelineBase(dspy.Module):
             api_base=self._model_config.base_url,
             cache=False,  # Disable DSPy's built-in response caching
         )
-        dspy.configure(lm=self.lm)
+        dspy.configure(lm=self.lm, track_usage=True)
         if optimized_program is not None:
             assert Path(optimized_program).exists(), (
                 "Path to optimized program does not exist"
@@ -147,6 +145,9 @@ class PipelineBase(dspy.Module):
             problem_file=self.vars.problem_file,
             plan_file=self.vars.plan_file,
             log_file=self.vars.log_file,
+            ablate_tools=";".join(self.ablate_tools) if self.ablate_tools else None,
+            input_tokens=self.vars.input_tokens,
+            output_tokens=self.vars.output_tokens,
             create_pddl_file_calls=self.vars.create_pddl_file_calls,
             read_pddl_file_calls=self.vars.read_pddl_file_calls,
             edit_lines_calls=self.vars.edit_lines_calls,
@@ -154,6 +155,7 @@ class PipelineBase(dspy.Module):
             problem_syntax_mistakes_calls=self.vars.problem_syntax_mistakes_calls,
             translate_pddl_calls=self.vars.translate_pddl_calls,
             generate_plan_calls=self.vars.generate_plan_calls,
+            get_plan_feedback_calls=self.vars.get_plan_feedback_calls,
         )
 
     def run(self) -> PipelineResult:
@@ -181,12 +183,6 @@ class PipelineBase(dspy.Module):
 
     def run_eval(self, iterations: int) -> Path:
         results: list[PipelineResult] = []
-        # Prevent dspy from cluttering stdout when running in eval mode
-        dspy.disable_litellm_logging()
-        dspy.disable_logging()
-        for logger_name in ("dspy", "litellm", "LiteLLM"):
-            logging.getLogger(logger_name).setLevel(logging.ERROR)
-
         for _ in tqdm(range(iterations), desc="Running Evaluation"):
             results.append(self.run())
         results_name = (
@@ -357,7 +353,7 @@ class PipelineBase(dspy.Module):
 
     ## GENERAL UTIL
 
-    def print_and_clear_history(self):  # noqa: C901
+    def log_and_clear_history(self):  # noqa: C901
         """
         Log interaction history in one shot and clear everything after to always get interactions from last run only
         """

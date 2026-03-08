@@ -3,8 +3,8 @@ from pathlib import Path
 
 import dspy
 
-from src.base.pipeline import PipelineBase, Pipelines
-from src.base.schema import PDDLFiles, PipelineError
+from src.base.pipeline import PipelineBase
+from src.base.schema import PDDLFiles, PipelineError, Pipelines
 from src.constants import images_dir
 from src.eval.fast_downward import ExitCodes, FDErrorInfo
 from src.eval.val import (
@@ -126,7 +126,9 @@ class RigidTrajectoryImagePipeline(PipelineBase):
     def __init__(
         self, model: Models, domain: Domains, pipeline: Pipelines | None = None
     ):
-        super().__init__(model, domain, pipeline or Pipelines.RIGID_TRAJECTORY_IMAGE)
+        super().__init__(
+            model, domain, pipeline=pipeline or Pipelines.RIGID_TRAJECTORY_IMAGE
+        )
 
         self.generate_domain_module_image = dspy.Predict(GenerateDomainImage)
         self.generate_problem_module_image = dspy.Predict(GenerateProblemImage)
@@ -283,45 +285,45 @@ class RigidTrajectoryImagePipeline(PipelineBase):
             scene=image, domain_description=domain_description
         )
         domain = domain_result.domain_pddl
-        self.print_and_clear_history()
+        self.log_and_clear_history()
 
         self.vars.domain_file = self._write_pddl_file(
             domain, pddl_file_type=PDDLFiles.DOMAIN
         )
         self.fix_domain(self.vars.domain_file, image=image)
         if not is_domain_valid(self.vars.domain_file):
-            self.print_and_clear_history()
+            self.log_and_clear_history()
             logger.debug("Domain failure")
             return dspy.Prediction(out=PipelineError.DOMAIN_FAILURE)
-        self.print_and_clear_history()
+        self.log_and_clear_history()
 
         self.vars.num_model_calls += 1
         problem_result = self.generate_problem_module_image(
             scene=image, domain_pddl=domain, problem_description=problem_description
         )
         problem = problem_result.problem_pddl
-        self.print_and_clear_history()
+        self.log_and_clear_history()
 
         self.vars.problem_file = self._write_pddl_file(
             problem, pddl_file_type=PDDLFiles.PROBLEM
         )
         self.fix_problem(self.vars.domain_file, self.vars.problem_file, image=image)
         if not is_problem_valid(self.vars.domain_file, self.vars.problem_file):
-            self.print_and_clear_history()
+            self.log_and_clear_history()
             logger.debug("Problem failure")
             return dspy.Prediction(out=PipelineError.PROBLEM_FAILURE)
-        self.print_and_clear_history()
+        self.log_and_clear_history()
 
         planner_output = self.fix_planning(
             self.vars.domain_file, self.vars.problem_file, image=image
         )
         if isinstance(planner_output, FDErrorInfo):
-            self.print_and_clear_history()
+            self.log_and_clear_history()
             logger.debug("Failed to generate a plan")
             return dspy.Prediction(out=planner_output.to_pipeline_error())
         logger.debug("# Successfully generated a plan")
         self.vars.plan_file = planner_output
-        self.print_and_clear_history()
+        self.log_and_clear_history()
         return dspy.Prediction(out=None)
 
     def compile_module(self):
@@ -335,4 +337,9 @@ class RigidTrajectoryImagePipeline(PipelineBase):
             get_prompt(Prompts.RING_AND_PEG_PROBLEM),
             "peg_and_ring_plan_start.png",
         )
+        token_usage = prediction.get_lm_usage()
+        assert token_usage is not None
+        token_usage = token_usage[f"openai/{self._model_config.api_model_name}"]
+        self.vars.input_tokens = token_usage["prompt_tokens"]
+        self.vars.output_tokens = token_usage["completion_tokens"]
         return self.create_result(error=prediction.out)
