@@ -6,8 +6,8 @@ from typing import Literal
 
 import dspy
 
-from src.base.pipeline import FDErrorInfo, PipelineBase, Pipelines
-from src.base.schema import PDDLFiles, PipelineError
+from src.base.pipeline import FDErrorInfo, PipelineBase
+from src.base.schema import PDDLFiles, PipelineError, Pipelines, Tools
 from src.eval.fast_downward import translate_pddl as _translate_pddl
 from src.eval.val import get_syntax_mistakes_domain as _get_syntax_mistakes_domain
 from src.eval.val import get_syntax_mistakes_problem as _get_syntax_mistakes_problem
@@ -30,30 +30,56 @@ class GeneratePddlSignature(dspy.Signature):
     )
 
 
+# NOTE: This would likely benefit from its own separate optimization but is likely going to be to costly
+class PlanFeedbackSignature(dspy.Signature):
+    __doc__ = get_prompt(Prompts.GENERATION_CONTEXT_PLAN_FEEDBACK)
+
+    task_and_plan: str = dspy.InputField(
+        desc="The generated plan and a natural language description of the task the plan should be applied to."
+    )
+    feedback: str = dspy.OutputField(desc="Actionable feedback on the provided plan.")
+
+
 class ToolCallPipeline(PipelineBase):
     def __init__(
         self,
         model: Models,
         domain: Domains,
+        ablate_tools: list[Tools] | None = None,
         pipeline: Pipelines | None = None,
         optimized_program: str | None = None,
     ):
         super().__init__(
-            model, domain, pipeline or Pipelines.TOOL_CALL, optimized_program
+            model,
+            domain,
+            ablate_tools,
+            pipeline or Pipelines.TOOL_CALL,
+            optimized_program,
         )
+        self.tools = {
+            Tools.CREATE_PDDL_FILE: self.create_pddl_file,
+            Tools.READ_PDDL_FILE: self.read_pddl_file,
+            Tools.EDIT_LINES: self.edit_lines,
+            Tools.GET_SYNTAX_MISTAKES_DOMAIN: self.get_syntax_mistakes_domain,
+            Tools.GET_SYNTAX_MISTAKES_PROBLEM: self.get_syntax_mistakes_problem,
+            Tools.TRANSLATE_PDDL: self.translate_pddl,
+            Tools.GENERATE_PLAN: self.generate_plan,
+            Tools.GET_PLAN_FEEDBACK: self.get_plan_feedback,
+        }
+        # Remove tools for ablation
+        if ablate_tools is not None:
+            for tool in ablate_tools:
+                if tool in self.tools:
+                    del self.tools[tool]
+                elif tool is not None:
+                    logger.info(f"{tool} could not be ablated, as it is not available.")
+        logger.debug(f"Available tools: {list(self.tools.keys())}")
         self.generate_pddl_module = dspy.ReAct(
             GeneratePddlSignature,
-            tools=[
-                self.create_pddl_file,
-                self.read_pddl_file,
-                self.edit_lines,
-                self.get_syntax_mistakes_domain,
-                self.get_syntax_mistakes_problem,
-                self.translate_pddl,
-                self.generate_plan,
-            ],
+            tools=list(self.tools.values()),
             max_iters=20,
         )
+        self.plan_feedback_module = dspy.Predict(PlanFeedbackSignature)
         if optimized_program is not None:
             self.load(optimized_program)
 
@@ -232,9 +258,36 @@ class ToolCallPipeline(PipelineBase):
         plan_output = self._generate_plan(Path(domain_file), Path(problem_file))
         if isinstance(plan_output, FDErrorInfo):
             return "Fast Downward was unable to generate a plan" + plan_output.to_str()
-        return f"Fast Downward successfully generated a plan under {plan_output}"
+        with open(plan_output) as f:
+            return f"Fast Downward successfully generated a plan under {plan_output}.\n\nGenerated plan:\n{f.read()}"
 
-    def forward(self, task_description: str) -> dspy.Prediction:
+    def get_plan_feedback(self, plan_file: str) -> str:
+        """
+        Get detailed feedback on the feasibility of a generated plan given the current task.
+
+        :param domain_file: the path to the domain file
+        :type domain_file: str
+        :param problem_file: the path to the problem file
+        :type problem_file: str
+        :param plan_file: the path to the plan_file
+        :type problem_file: str
+        :return: Feedback on the physical/logical feasibility of the generated plan.
+        :rtype: str
+        """
+        self.vars.get_plan_feedback_calls += 1
+        base_plan_feedback_prompt = get_prompt(Prompts.PLAN_FEEDBACK)
+        with open(plan_file) as f:
+            plan = f.read()
+        plan_feedback_prompt = base_plan_feedback_prompt.format(
+            # TODO: We need to update this to accept/gather other domain/problem instructions than ring_and_peg in the future
+            task=get_prompt(Prompts.RING_AND_PEG),
+            plan=plan,
+        )
+        return self.plan_feedback_module(task_and_plan=plan_feedback_prompt).feedback
+
+    def forward(
+        self, task_description: str, scene: dspy.Image | None = None
+    ) -> dspy.Prediction:
         error = None
         self.generate_pddl_module(
             task_description=task_description,
@@ -266,5 +319,10 @@ class ToolCallPipeline(PipelineBase):
 
     def _run_impl(self):
         prediction = self(get_prompt(Prompts.RING_AND_PEG))
-        self.print_and_clear_history()
+        token_usage = prediction.get_lm_usage()
+        assert token_usage is not None, "token_usage is None"
+        token_usage = token_usage[f"openai/{self._model_config.api_model_name}"]
+        self.vars.input_tokens = token_usage["prompt_tokens"]
+        self.vars.output_tokens = token_usage["completion_tokens"]
+        self.log_and_clear_history()
         return self.create_result(error=prediction.out)
