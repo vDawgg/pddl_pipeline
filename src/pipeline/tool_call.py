@@ -1,4 +1,5 @@
 import logging
+import re
 import shutil
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -257,7 +258,9 @@ class ToolCallPipeline(PipelineBase):
         self.vars.generate_plan_calls += 1
         plan_output = self._generate_plan(Path(domain_file), Path(problem_file))
         if isinstance(plan_output, FDErrorInfo):
-            return "Fast Downward was unable to generate a plan" + plan_output.to_str()
+            return (
+                "Fast Downward was unable to generate a plan\n" + plan_output.to_str()
+            )
         with open(plan_output) as f:
             return f"Fast Downward successfully generated a plan under {plan_output}.\n\nGenerated plan:\n{f.read()}"
 
@@ -278,10 +281,26 @@ class ToolCallPipeline(PipelineBase):
         base_plan_feedback_prompt = get_prompt(Prompts.PLAN_FEEDBACK)
         with open(plan_file) as f:
             plan = f.read()
+        # While the below works a bit better, the feedback is still bitching
+        # about the number of params in the plan and seems to have less understanding
+        # of the domain even though it has image input available
+        move_pattern = r"\(\s*move\s+(\w+)[^)]*\)"
+        pick_pattern = r"\(\s*pick\b[^)]*\)"
+        place_pattern = r"\(\s*place\b[^)]*\)"
+        action_sequence = []
+        for line in plan.split("\n"):
+            if match := re.match(move_pattern, line):
+                action_sequence.append(f"(move {match.group(1)})")
+            elif re.match(pick_pattern, line):
+                action_sequence.append("(pick)")
+            elif re.match(place_pattern, line):
+                action_sequence.append("(place)")
+            elif line.startswith("; cost"):
+                continue
         plan_feedback_prompt = base_plan_feedback_prompt.format(
             # TODO: We need to update this to accept/gather other domain/problem instructions than ring_and_peg in the future
             task=get_prompt(Prompts.RING_AND_PEG),
-            plan=plan,
+            plan="\n".join(action_sequence),
         )
         return self.plan_feedback_module(task_and_plan=plan_feedback_prompt).feedback
 

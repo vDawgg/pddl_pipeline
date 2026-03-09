@@ -2,7 +2,7 @@
 
 The actions available to the robot are:
 - move(to)
-    - Moves the robot to a specified position
+    - Moves the robot to a specified position. Note, that the robot **always** has to move to a specific position before being able to execute another action.
 - pick()
     - Closes the robot arms gripper at the current position
 - place()

@@ -37,7 +37,9 @@ class DSPyToolCallPipelineAbstraction(ToolCallPipeline):
             Path(domain_file), Path(problem_file), UnsolvabilityFeedback.ABSTRACTION
         )
         if isinstance(plan_output, FDErrorInfo):
-            return "Fast Downward was unable to generate a plan" + plan_output.to_str()
+            return (
+                "Fast Downward was unable to generate a plan\n" + plan_output.to_str()
+            )
         return f"Fast Downward successfully generated a plan under {plan_output}"
 
     def __init__(
