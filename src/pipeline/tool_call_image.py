@@ -55,7 +55,7 @@ class ToolCallImagePipeline(ToolCallPipeline):
         self.generate_pddl_module = dspy.ReAct(
             GeneratePddlSignature,
             tools=list(self.tools.values()),
-            max_iters=20,
+            max_iters=30,
         )
 
     def get_plan_feedback(self, plan_file: str) -> str:
@@ -76,7 +76,7 @@ class ToolCallImagePipeline(ToolCallPipeline):
             plan = f.read()
         plan_feedback_prompt = base_plan_feedback_prompt.format(
             # TODO: We need to update this to accept/gather other domain/problem instructions than ring_and_peg in the future
-            task=get_prompt(Prompts.RING_AND_PEG),
+            task=get_prompt(Prompts.RING_AND_PEG_IMAGE),
             plan=plan,
         )
         return self.plan_feedback_module(
@@ -113,7 +113,7 @@ class ToolCallImagePipeline(ToolCallPipeline):
     def _run_impl(self):
         prediction = self(
             dspy.Image(str(images_dir / "peg_and_ring_plan_start.png")),
-            get_prompt(Prompts.RING_AND_PEG),
+            get_prompt(Prompts.RING_AND_PEG_IMAGE),
         )
         token_usage = prediction.get_lm_usage()
         assert token_usage is not None

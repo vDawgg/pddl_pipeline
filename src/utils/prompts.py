@@ -13,6 +13,7 @@ class Prompts(StrEnum):
     BLOCKSWORLD_DOMAIN = "blocksworld_domain.md"
     BLOCKSWORLD_PROBLEM = "blocksworld_problem.md"
     RING_AND_PEG = "ring_and_peg.md"
+    RING_AND_PEG_IMAGE = "ring_and_peg_image.md"
     RING_AND_PEG_DOMAIN = "ring_and_peg_domain.md"
     RING_AND_PEG_PROBLEM = "ring_and_peg_problem.md"
     RING_AND_PEG_PLAN = "ring_and_peg_plan.md"
