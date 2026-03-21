@@ -51,7 +51,11 @@ def make_error_info(parser_output: str, lines: list[str], problem: bool = False)
                 num_warnings = int(match.group(2))
 
         elif ": Error:" in line or ": Warning:" in line:
-            if "domain" in line and problem is True:
+            if (
+                "domain" in line
+                and problem is True
+                and "error in problem file" not in line
+            ):
                 continue
             match = re.search(r"line:\s*(\d+):\s*(Error|Warning):\s*(.+)", line)
             if match:
@@ -75,6 +79,9 @@ def make_error_info(parser_output: str, lines: list[str], problem: bool = False)
                         pddl_line_num=line_num,
                     )
                 )
+    if len(errors) == 0 and num_errors > 0:
+        logger.debug("# Issue in VAL error info")
+        logger.debug(parser_output)
     return VALErrorInfo(num_errors, num_warnings, errors, warnings)
 
 

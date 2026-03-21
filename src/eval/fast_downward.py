@@ -491,7 +491,6 @@ class TranslateParser:
                 continue
             in_error = True
             error_lines.append(stripped)
-        # FIXME: Hitting this again
         assert len(error_lines) > 0
         return FDErrorInfo(
             fd_code,
@@ -536,6 +535,9 @@ def translate_pddl(domain_file: Path, problem_file: Path) -> FDErrorInfo | None:
     After this succceeds without issues, teh only issue that can still occur is
     the domain being unsolvable.
     """
+    assert domain_file.exists() and problem_file.exists(), (
+        "Given domain or problem file does not exist"
+    )
     sas_file = NamedTemporaryFile(delete=False)
     process = run(
         [

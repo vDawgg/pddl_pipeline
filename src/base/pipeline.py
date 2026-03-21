@@ -130,6 +130,11 @@ class PipelineBase(dspy.Module):
             )
             self.name = f"{self.domain}_{self.pipeline}_{self.model.split('/')[-1]}_{Path(optimized_program).name}"
 
+    def deepcopy(self):
+        new_instance = super().deepcopy()
+        new_instance.vars = ThreadSafeClassVars()
+        return new_instance
+
     ## PIPELINE RUN LOGIC
 
     def create_result(

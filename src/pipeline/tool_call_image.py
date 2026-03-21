@@ -58,21 +58,17 @@ class ToolCallImagePipeline(ToolCallPipeline):
             max_iters=20,
         )
 
-    def get_plan_feedback(self, plan_file: str) -> str:
+    def get_plan_feedback(self) -> str:
         """
         Get detailed feedback on the feasibility of a generated plan given the current task.
 
-        :param domain_file: the path to the domain file
-        :type domain_file: str
-        :param problem_file: the path to the problem file
-        :type problem_file: str
-        :param plan_file: the path to the plan_file
-        :type problem_file: str
         :return: Feedback on the physical/logical feasibility of the generated plan.
         :rtype: str
         """
         base_plan_feedback_prompt = get_prompt(Prompts.PLAN_FEEDBACK)
-        with open(plan_file) as f:
+        if self.vars.plan_file is None:
+            return "Could not generate feedback, as no plan has been generated to provide feedback on."
+        with open(self.vars.plan_file) as f:
             plan = f.read()
         plan_feedback_prompt = base_plan_feedback_prompt.format(
             # TODO: We need to update this to accept/gather other domain/problem instructions than ring_and_peg in the future
