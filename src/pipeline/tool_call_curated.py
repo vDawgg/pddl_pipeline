@@ -2,9 +2,9 @@ from pathlib import Path
 
 import dspy
 
-from src.base.schema import Pipelines
+from src.base.schema import Pipelines, Tools
 from src.constants import project_root
-from src.eval.fast_downward import FDErrorInfo, UnsolvabilityFeedback
+from src.eval.fast_downward import FDErrorInfo
 from src.inference import Models
 from src.pipeline.tool_call import GeneratePddlSignature, ToolCallPipeline
 from src.utils.domains import Domains
@@ -13,29 +13,34 @@ from src.utils.domains import Domains
 class DSPyToolCallPipelineCurated(ToolCallPipeline):
     """Version of dspy tool call pipeline with curated unsolvabiliity feedback"""
 
-    def generate_plan(self, domain_file: str, problem_file: str) -> str:
+    def generate_plan(self) -> str:
         """
         Try to generate a plan given a domain and problem file using the fast downward planning system.
-        The function either answers witht the path to the generated plan if successfull or with error information if planning was unsuccessfull.
+        The function answers with the generated plan or error information if the generation fails.
         The main types of errors that happen either stem from the plan / domain containing syntax mistakes or the domain / problem being ill-defined leading to the planner not being able to find a plan.
 
-        :param domain_file: the path to the domain file
-        :type domain_file: str
-        :param problem_file: the path to the problem file
-        :type problem_file: str
-        :return: The path to the problem file or an error description
+        :return: The outcome of the planning process
         :rtype: str
         """
-        self.generate_plan_calls += 1
+        self.vars.generate_plan_calls += 1
+        if self.vars.domain_file is None:
+            return "Domain file has not yet been created"
+        elif self.vars.problem_file is None:
+            return "Problem file has not yet been created"
         plan_output = self._generate_plan(
-            Path(domain_file), Path(problem_file), UnsolvabilityFeedback.CURATED
+            Path(self.vars.domain_file), Path(self.vars.problem_file)
         )
         if isinstance(plan_output, FDErrorInfo):
             return "Fast Downward was unable to generate a plan" + plan_output.to_str()
         return f"Fast Downward successfully generated a plan under {plan_output}"
 
     def __init__(
-        self, model: Models, domain: Domains, pipeline: Pipelines | None = None
+        self,
+        model: Models,
+        domain: Domains,
+        ablate_tools: list[Tools] | None = None,
+        pipeline: Pipelines | None = None,
+        optimized_program: str | None = None,
     ):
         dspy.Module.__init__(self)
         ToolCallPipeline.__init__(
