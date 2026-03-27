@@ -163,6 +163,16 @@ def make_ds(
         )
         for i in range(10)
     ]
+    depot.extend(
+        make_example(
+            domain_prompt_file="Depot.md",
+            problem_prompt_file=f"DepotTest_{i}.md",
+            domain_name="PDDLEnvDepotTest",
+            problem_idx=i,
+            separate_prompts=separate_prompts,
+        )
+        for i in range(12)
+    )
     # minecraft
     minecraft = [
         make_example(
@@ -174,6 +184,16 @@ def make_ds(
         )
         for i in range(30)
     ]
+    minecraft.extend(
+        make_example(
+            domain_prompt_file="Minecraft.md",
+            problem_prompt_file=f"MinecraftTest_{i}.md",
+            domain_name="PDDLEnvMinecraftTest",
+            problem_idx=i,
+            separate_prompts=separate_prompts,
+        )
+        for i in range(30)
+    )
 
     shuffle(blocks)
     shuffle(gripper)

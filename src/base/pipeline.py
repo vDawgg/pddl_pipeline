@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import dspy
 import polars as pl
+from dspy.teleprompt.gepa.gepa_utils import ScoreWithFeedback
 from pydantic import BaseModel
 from tqdm import tqdm
 
@@ -216,13 +217,19 @@ class PipelineBase(dspy.Module):
         trace=None,
         pred_name=None,
         pred_trace=None,
-    ) -> float:
+    ) -> ScoreWithFeedback:
         """Evaluation metric for usage with DSPy optimizers. Tries to optimize for incremental success."""
         pred_error: PipelineError | None = pred.out
         if pred_error == PipelineError.PLAN_FAILURE_TRANSLATE:
-            return 0.25
+            return ScoreWithFeedback(
+                score=0.25,
+                feedback="The program was unable to generate PDDL that could be used by the planning system due to syntactic or structural issues.",
+            )
         elif pred_error == PipelineError.PLAN_FAILURE_UNSOLVABLE:
-            return 0.5
+            return ScoreWithFeedback(
+                score=0.5,
+                feedback="The program was unable to generate solvable PDDL",
+            )
         elif pred_error is None:
             # We cannot use the class instances plan files here, as this metric function
             # is not multi-threaded and therefor only has the vars instance of the original
@@ -234,10 +241,20 @@ class PipelineBase(dspy.Module):
                 pred.plan_file,
             )
             if planning_success:
-                return 1.0
+                return ScoreWithFeedback(
+                    score=1.0,
+                    feedback="The program successfully generated PDDL that could be used to generate a plan solving the given task.",
+                )
             else:
-                return 0.75
-        return 0.0
+                return ScoreWithFeedback(
+                    score=0.75,
+                    feedback="The program generated solvable PDDL that resulted in a plan, which did not solve the given task.",
+                )
+        # TODO:Figure out how to differentiate this from the translation errors
+        return ScoreWithFeedback(
+            score=0.0,
+            feedback="The program was unable to generate a syntactically valid domain/problem.",
+        )
 
     def _compile_module(self, separate_prompts: bool = False):
         log_file = logs_dir / f"{self.name}_optimization_{get_current_timestamp()}.log"
