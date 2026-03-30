@@ -10,11 +10,10 @@ The plan will need to be carried out in the real world and should therefor respe
 
 Do not make suggestions apart from the focuses noted above.
 
-**Important**: 
-- Be specific in your critique and provide suggestions to fix logical/physical flaws. 
+**Important**:
+- Be specific in your critique and provide suggestions to fix logical/physical flaws.
 - Do not try to provide a plan yourself.
-- Provide actional feedback on why a plan is feasible/unfeasible. 
-- Do **not** provide feedback on PDDL files where you have not seen the content. 
-- Do **not** provide feedback on the number of parameters of a given action.
+- Provide actional feedback on why a plan is feasible/unfeasible.
+- Do **not** provide feedback on PDDL files where you have not seen the content.
 - The cost annotations at the end of the file are an artifact from the fast downward plan generation and have no relevance for your feedback.
 - BE CONCISE.
