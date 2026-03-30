@@ -40,6 +40,17 @@ class PlanFeedbackSignature(dspy.Signature):
     feedback: str = dspy.OutputField(desc="Actionable feedback on the provided plan.")
 
 
+class ActionMappingSignature(dspy.Signature):
+    __doc__ = get_prompt(Prompts.GENERATION_CONTEXT_ACTION_MAPPING)
+
+    plan_and_actions: str = dspy.InputField(
+        desc="The generated plan, PDDL domain and schema of the robots actions."
+    )
+    mapped_plan: str = dspy.OutputField(
+        desc="The plan with the actions mapped to the robots action schema."
+    )
+
+
 class ToolCallPipeline(PipelineBase):
     def __init__(
         self,
@@ -71,7 +82,7 @@ class ToolCallPipeline(PipelineBase):
             for tool in ablate_tools:
                 if tool in self.tools:
                     del self.tools[tool]
-                elif tool is not None:
+                elif tool != "":
                     logger.info(f"{tool} could not be ablated, as it is not available.")
         logger.debug(f"Available tools: {list(self.tools.keys())}")
         self.generate_pddl_module = dspy.ReAct(
@@ -80,6 +91,7 @@ class ToolCallPipeline(PipelineBase):
             max_iters=30,
         )
         self.plan_feedback_module = dspy.Predict(PlanFeedbackSignature)
+        self.action_mapping_module = dspy.Predict(ActionMappingSignature)
         if optimized_program is not None:
             self.load(optimized_program)
 
@@ -325,7 +337,22 @@ class ToolCallPipeline(PipelineBase):
                 )
                 error = plan.to_pipeline_error()
             else:
+                # FIXME: This is somehow overwriting the rest of the debug output
                 self.vars.plan_file = plan
+                # Log history before gathering new instance below
+                self.log_and_clear_history()
+                # Map plan to action schema of robot
+                base_action_mapping_prompt = get_prompt(Prompts.ACTION_MAPPING)
+                with open(self.vars.plan_file) as f:
+                    action_mapping_prompt = base_action_mapping_prompt.format(
+                        domain=self.read_pddl_file(PDDLFiles.DOMAIN),
+                        plan=f.read(),
+                    )
+                    plan_mapping_out = self.action_mapping_module(
+                        plan_and_actions=action_mapping_prompt
+                    )
+                with open(self.vars.plan_file, "w") as f:
+                    f.write(plan_mapping_out.mapped_plan)
                 return dspy.Prediction(out=error, plan_file=plan)
         return dspy.Prediction(out=error, plan_file=None)
 

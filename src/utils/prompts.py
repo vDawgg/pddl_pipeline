@@ -10,6 +10,7 @@ class Prompts(StrEnum):
     GENERATION_CONTEXT_TOOLS_IMAGES = "generation_context_tools_images.md"
     GENERATION_CONTEXT_IMAGES = "generation_context_images.md"
     GENERATION_CONTEXT_PLAN_FEEDBACK = "generation_context_plan_feedback.md"
+    GENERATION_CONTEXT_ACTION_MAPPING = "generation_context_action_mapping.md"
     BLOCKSWORLD_DOMAIN = "blocksworld_domain.md"
     BLOCKSWORLD_PROBLEM = "blocksworld_problem.md"
     RING_AND_PEG = "ring_and_peg.md"
@@ -27,6 +28,7 @@ class Prompts(StrEnum):
     PLANNER_TRANSLATE_CONTEXT_IMAGES = "planner_translate_context_images.md"
     PLANNER_TRANSLATE_TASK = "planner_translate_task.md"
     PLAN_FEEDBACK = "plan_feedback.md"
+    ACTION_MAPPING = "action_mapping.md"
 
 
 def get_prompt(*prompts: Prompts) -> str:
