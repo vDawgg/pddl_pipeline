@@ -8,4 +8,4 @@ Additionally, make sure your output is complete and can be used by a solver to g
 
 After creating the files, verify that they do not contain syntax mistakes. If they do contain mistakes, edit the files to fix them. Additionally, ensure that the task defined in the PDDL files is actually sovlable using the Fast Downward planning system. Before a plan can be generated, ensure that the translation layer of the Fast Downward planning system runs without reporting any further issues.
 
-All PDDL files have to adhere to the PDDL 1.0 standard.
+All PDDL files have to adhere to the PDDL 1.2 standard.

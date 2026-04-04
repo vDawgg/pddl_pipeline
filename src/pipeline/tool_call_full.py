@@ -2,12 +2,11 @@ from pathlib import Path
 
 import dspy
 
-from src.base.schema import Pipelines, Tools
+from src.base.schemas import Domains, Pipelines, Problems, Tools
 from src.constants import project_root
 from src.eval.fast_downward import FDErrorInfo
 from src.inference import Models
 from src.pipeline.tool_call import GeneratePddlSignature, ToolCallPipeline
-from src.utils.domains import Domains
 
 
 class DSPyToolCallPipelineFull(ToolCallPipeline):
@@ -38,13 +37,14 @@ class DSPyToolCallPipelineFull(ToolCallPipeline):
         self,
         model: Models,
         domain: Domains,
+        problem: Problems,
         ablate_tools: list[Tools] | None = None,
         pipeline: Pipelines | None = None,
         optimized_program: str | None = None,
     ):
         dspy.Module.__init__(self)
         ToolCallPipeline.__init__(
-            self, model, domain, pipeline=pipeline or Pipelines.TOOL_CALL_FULL
+            self, model, domain, problem, pipeline=pipeline or Pipelines.TOOL_CALL_FULL
         )
 
         key_path = project_root / self._model_config.key_file

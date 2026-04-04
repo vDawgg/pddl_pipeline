@@ -3,9 +3,9 @@ import os
 from argparse import ArgumentParser
 
 from src.base.pipeline import Tools
+from src.base.schemas import Domains, Problems
 from src.inference import Models
 from src.pipeline import Pipelines, pipelines
-from src.utils.domains import Domains
 from src.utils.logger import configure_logging
 
 # TODO: For ease of use this should probably just be merged with main.py
@@ -38,6 +38,12 @@ if __name__ == "__main__":
         required=False,
     )
     parser.add_argument(
+        "--problem",
+        choices=[problem.value for problem in Problems],
+        default=Problems.RING_AND_PEG_1,
+        required=False,
+    )
+    parser.add_argument(
         "--ablate_tools",
         help=f"Tools to able from the tool-calling pipeline. Should be given as comma separated list. Available tools are: [{[tool.value for tool in Tools]}]",
         required=False,
@@ -55,7 +61,10 @@ if __name__ == "__main__":
     pipeline = args.pipeline
     model = args.model
     domain = args.domain
-    ablate_tools = str(args.ablate_tools).split(",")
+    problem = args.problem
+    ablate_tools = args.ablate_tools
+    if ablate_tools is not None:
+        ablate_tools = str(ablate_tools).split(",")
     optimize = args.optimize
     optimized_program = args.optimized_program
 
@@ -63,9 +72,9 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
 
     if optimize and pipeline in [Pipelines.TOOL_CALL, Pipelines.RIGID_TRAJECTORY]:
-        pipelines[pipeline](model, domain).compile_module()
+        pipelines[pipeline](model, domain, problem).compile_module()
     else:
         results_file = pipelines[pipeline](
-            model, domain, ablate_tools, optimized_program=optimized_program
+            model, domain, problem, ablate_tools, optimized_program=optimized_program
         ).run_eval(iterations)
         logger.info(f"# Saved results to {results_file}")

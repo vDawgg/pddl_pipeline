@@ -1,14 +1,13 @@
 import difflib
 
 from src.base.pipeline import PipelineBase
-from src.base.schema import PDDLFiles
+from src.base.schemas import Domains, PDDLFiles, Problems
 from src.eval.fast_downward import (
     ExitCodes,
     FDErrorInfo,
     UnsolvabilityFeedback,
 )
 from src.inference import Models
-from src.utils.domains import Domains
 from tests.constants import eval_resource_dir
 
 
@@ -17,6 +16,7 @@ class TestFastDownward:
         self.pipeline = PipelineBase(
             model=Models.GEMMA_3_12B,
             domain=Domains.RING_AND_PEG,
+            problem=Problems.RING_AND_PEG_1,
         )
 
     def test_translate_error_expected(self):

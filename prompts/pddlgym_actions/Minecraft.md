@@ -1,0 +1,5 @@
+(recall item agent)
+(move from to)
+(craftplank craft-table agent item)
+(equip item agent)
+(pick item location)

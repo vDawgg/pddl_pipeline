@@ -11,7 +11,7 @@ from pddl.logic.base import And, BinaryOp, Not, QuantifiedCondition, UnaryOp
 from pddl.logic.predicates import EqualTo, Predicate
 
 from pddl import parse_domain, parse_problem
-from src.base.schema import PDDLFiles, PipelineError
+from src.base.schemas import PDDLFiles, PipelineError
 
 logger = logging.getLogger(__name__)
 

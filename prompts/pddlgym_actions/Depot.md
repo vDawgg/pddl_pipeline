@@ -1,0 +1,5 @@
+(Drive truck to-place from-place)
+(Lift hoist crate surface place)
+(Drop hoist crate surface place)
+(Load hoist crate truck place)
+(Unload hoist crate truck place)

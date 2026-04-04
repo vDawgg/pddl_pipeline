@@ -15,7 +15,15 @@ from dspy.teleprompt.gepa.gepa_utils import ScoreWithFeedback
 from pydantic import BaseModel
 from tqdm import tqdm
 
-from src.base.schema import PDDLFiles, PipelineError, PipelineResult, Pipelines, Tools
+from src.base.schemas import (
+    Domains,
+    PDDLFiles,
+    PipelineError,
+    PipelineResult,
+    Pipelines,
+    Problems,
+    Tools,
+)
 from src.constants import (
     generated_pddl_dir,
     logs_dir,
@@ -31,7 +39,6 @@ from src.eval.fast_downward import (
     parse_error,
 )
 from src.inference import Models, get_model_config
-from src.utils.domains import Domains
 from src.utils.logger import add_file_handler, remove_file_handler
 from src.utils.pddlgym_utils import goal_reached, make_ds
 from src.utils.timestamp import get_current_timestamp
@@ -78,6 +85,7 @@ class ThreadSafeClassVars(threading.local):
         self.problem_file: Path | None = None
         self.plan_file: Path | None = None
         self.log_file: Path | None = None
+        self.task_description: str | None = None
 
     def reset(self, name: str):
         self.num_model_calls = 0
@@ -86,6 +94,7 @@ class ThreadSafeClassVars(threading.local):
         self.edit_lines_calls = 0
         self.domain_syntax_errors_calls = 0
         self.problem_syntax_mistakes_calls = 0
+        self.translate_pddl_calls = 0
         self.generate_plan_calls = 0
         self.get_plan_feedback_calls = 0
         self.input_tokens = 0
@@ -94,6 +103,7 @@ class ThreadSafeClassVars(threading.local):
         self.problem_file = None
         self.plan_file = None
         self.log_file = logs_dir / f"{name}_{get_current_timestamp()}_{uuid4().hex}.log"
+        self.task_description = None
 
 
 class PipelineBase(dspy.Module):
@@ -101,15 +111,16 @@ class PipelineBase(dspy.Module):
         self,
         model: Models,
         domain: Domains,
+        problem: Problems,
         ablate_tools: list[Tools] | None = None,
         pipeline: Pipelines | None = None,
         optimized_program: str | None = None,
     ):
         self.model = model
-        # TODO: Just add these prompts according to the domain to this class. The dicts are too much.
         self.domain = domain
+        self.problem = problem
         self.pipeline = pipeline
-        self.name = f"{self.domain}_{self.pipeline}_{self.model.split('/')[-1]}_base"
+        self.name = f"{self.domain}_{self.problem}_{self.pipeline}_{self.model.split('/')[-1]}_base"
         self.vars = ThreadSafeClassVars()
         self.ablate_tools = ablate_tools
 
@@ -129,7 +140,7 @@ class PipelineBase(dspy.Module):
             assert Path(optimized_program).exists(), (
                 "Path to optimized program does not exist"
             )
-            self.name = f"{self.domain}_{self.pipeline}_{self.model.split('/')[-1]}_{Path(optimized_program).name}"
+            self.name = f"{self.domain}_{self.problem}_{self.pipeline}_{self.model.split('/')[-1]}_{Path(optimized_program).name}"
 
     def deepcopy(self):
         new_instance = super().deepcopy()
@@ -256,7 +267,7 @@ class PipelineBase(dspy.Module):
             feedback="The program was unable to generate a syntactically valid domain/problem.",
         )
 
-    def _compile_module(self, separate_prompts: bool = False):
+    def _optimize_program(self, separate_prompts: bool = False):
         log_file = logs_dir / f"{self.name}_optimization_{get_current_timestamp()}.log"
         file_handler = add_file_handler(log_file)
         start = time.perf_counter()
@@ -360,6 +371,9 @@ class PipelineBase(dspy.Module):
         file: Path | None = None,
         pddl_file_type: PDDLFiles | None = None,
     ) -> Path:
+        assert file or pddl_file_type, (
+            "Specify either the file to write to or the type of the PDDL file"
+        )
         file_path = (
             file
             or generated_pddl_dir
