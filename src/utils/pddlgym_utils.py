@@ -6,7 +6,13 @@ from random import shuffle
 
 import dspy
 
-from src.constants import pddlgym_domain_prompts_dir, pddlgym_problem_prompts_dir
+from src.base.schemas import Prompts
+from src.constants import (
+    pddlgym_action_prompts_dir,
+    pddlgym_domain_prompts_dir,
+    pddlgym_problem_prompts_dir,
+)
+from src.utils.prompts import get_prompt
 
 # Suppress gym's deprecation notice as we do not require newer functionality and have no
 # reason to upgrade gyms version
@@ -31,18 +37,26 @@ def get_pddl_gym_problem_prompt(file_name: str) -> str:
         return f.read()
 
 
+def get_action_schema_prompt(file_name: str) -> str:
+    with open(pddlgym_action_prompts_dir / file_name) as f:
+        return f.read()
+
+
 def get_combined_pddlgym_prompt(domain: str, problem: str) -> str:
-    prompt = ""
     with open(pddlgym_domain_prompts_dir / domain) as f:
-        prompt += f.read() + "\n\n"
+        domain = f.read()
     with open(pddlgym_problem_prompts_dir / problem) as f:
-        prompt += f.read()
-    return prompt
+        problem = f.read()
+    return get_prompt(Prompts.DOMAIN_AND_PROBLEM).format(
+        domain=domain,
+        problem=problem,
+    )
 
 
 def make_example(
     domain_prompt_file: str,
     problem_prompt_file: str,
+    action_schema_prompt_file: str,
     domain_name: str,
     problem_idx: int,
     separate_prompts: bool,
@@ -66,9 +80,10 @@ def make_example(
             domain_prompt_file,
             problem_prompt_file,
         ),
+        action_schema=get_action_schema_prompt(action_schema_prompt_file),
         domain_name=domain_name,
         problem_index=problem_idx,
-    ).with_inputs("task_description")
+    ).with_inputs("task_description", "action_schema")
 
 
 def make_ds(
@@ -88,6 +103,7 @@ def make_ds(
         make_example(
             domain_prompt_file="Blocks.md",
             problem_prompt_file=f"Blocks_{i}.md",
+            action_schema_prompt_file="Blocks.md",
             domain_name="PDDLEnvBlocks",
             problem_idx=i,
             separate_prompts=separate_prompts,
@@ -99,6 +115,7 @@ def make_ds(
             make_example(
                 domain_prompt_file="BlocksMedium.md",
                 problem_prompt_file=f"BlocksMedium_{i}.md",
+                action_schema_prompt_file="BlocksMedium.md",
                 domain_name="PDDLEnvBlocks_medium",
                 problem_idx=i,
                 separate_prompts=separate_prompts,
@@ -111,6 +128,7 @@ def make_ds(
         make_example(
             domain_prompt_file="Gripper.md",
             problem_prompt_file=f"Gripper_{i}.md",
+            action_schema_prompt_file="Gripper.md",
             domain_name="PDDLEnvGripper",
             problem_idx=i,
             separate_prompts=separate_prompts,
@@ -120,8 +138,9 @@ def make_ds(
     gripper.extend(
         [
             make_example(
-                domain_prompt_file="ManyGripper.md",
+                domain_prompt_file="Gripper.md",
                 problem_prompt_file=f"ManyGripper_{i}.md",
+                action_schema_prompt_file="Gripper.md",
                 domain_name="PDDLEnvManygripper",
                 problem_idx=i,
                 separate_prompts=separate_prompts,
@@ -132,8 +151,9 @@ def make_ds(
     # search and rescue
     search_and_rescue = [
         make_example(
-            domain_prompt_file="SearchAndRescueLevel1.md",
+            domain_prompt_file="SearchAndRescue.md",
             problem_prompt_file=f"SearchAndRescueLevel1_{i}.md",
+            action_schema_prompt_file="SearchAndRescue.md",
             domain_name="PDDLSearchAndRescueLevel1",
             problem_idx=i,
             separate_prompts=separate_prompts,
@@ -143,8 +163,9 @@ def make_ds(
     search_and_rescue.extend(
         [
             make_example(
-                domain_prompt_file="SearchAndRescueLevel2.md",
+                domain_prompt_file="SearchAndRescue.md",
                 problem_prompt_file=f"SearchAndRescueLevel2_{i}.md",
+                action_schema_prompt_file="SearchAndRescue.md",
                 domain_name="PDDLSearchAndRescueLevel2",
                 problem_idx=i,
                 separate_prompts=separate_prompts,
@@ -157,6 +178,7 @@ def make_ds(
         make_example(
             domain_prompt_file="Depot.md",
             problem_prompt_file=f"Depot_{i}.md",
+            action_schema_prompt_file="Depot.md",
             domain_name="PDDLEnvDepot",
             problem_idx=i,
             separate_prompts=separate_prompts,
@@ -167,6 +189,7 @@ def make_ds(
         make_example(
             domain_prompt_file="Depot.md",
             problem_prompt_file=f"DepotTest_{i}.md",
+            action_schema_prompt_file="Depot.md",
             domain_name="PDDLEnvDepotTest",
             problem_idx=i,
             separate_prompts=separate_prompts,
@@ -178,6 +201,7 @@ def make_ds(
         make_example(
             domain_prompt_file="Minecraft.md",
             problem_prompt_file=f"Minecraft_{i}.md",
+            action_schema_prompt_file="Minecraft.md",
             domain_name="PDDLEnvMinecraft",
             problem_idx=i,
             separate_prompts=separate_prompts,
@@ -188,6 +212,7 @@ def make_ds(
         make_example(
             domain_prompt_file="Minecraft.md",
             problem_prompt_file=f"MinecraftTest_{i}.md",
+            action_schema_prompt_file="Minecraft.md",
             domain_name="PDDLEnvMinecraftTest",
             problem_idx=i,
             separate_prompts=separate_prompts,

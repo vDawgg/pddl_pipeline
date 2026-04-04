@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 
 from src.base.pipeline import Pipelines
-from src.base.schema import PipelineError
+from src.base.schemas import PipelineError
 from src.constants import charts_dir, results_dir
 from src.inference import Models
 

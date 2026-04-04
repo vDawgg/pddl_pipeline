@@ -1,7 +1,3 @@
-## Task description
-
-Your task is to generate the PDDL domain for the following scenario:
-
 A robot arm is tasked to sort a set of colored rings on a set of pegs of the same colors. The arm can be used to pick up a ring from a peg, move a ring to another peg and place the ring on the other peg. Rings are already placed on pegs and can only be placed on pegs. To pick up a ring at a peg, the robot first has to move to the pegs position.
 
 The actions available to the robot are:

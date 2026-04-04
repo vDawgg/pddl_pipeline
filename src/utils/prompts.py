@@ -1,34 +1,5 @@
-from enum import StrEnum
-
+from src.base.schemas import Prompts
 from src.constants import prompts_dir
-from src.utils.domains import Domains
-
-
-class Prompts(StrEnum):
-    GENERATION_CONTEXT = "generation_context.md"
-    GENERATION_CONTEXT_TOOLS = "generation_context_tools.md"
-    GENERATION_CONTEXT_TOOLS_IMAGES = "generation_context_tools_images.md"
-    GENERATION_CONTEXT_IMAGES = "generation_context_images.md"
-    GENERATION_CONTEXT_PLAN_FEEDBACK = "generation_context_plan_feedback.md"
-    GENERATION_CONTEXT_ACTION_MAPPING = "generation_context_action_mapping.md"
-    BLOCKSWORLD_DOMAIN = "blocksworld_domain.md"
-    BLOCKSWORLD_PROBLEM = "blocksworld_problem.md"
-    RING_AND_PEG = "ring_and_peg.md"
-    RING_AND_PEG_DOMAIN = "ring_and_peg_domain.md"
-    RING_AND_PEG_PROBLEM = "ring_and_peg_problem.md"
-    RING_AND_PEG_PLAN = "ring_and_peg_plan.md"
-    VAL_FEEDBACK_CONTEXT = "val_feedback_context.md"
-    VAL_FEEDBACK_CONTEXT_IMAGES = "val_feedback_context_images.md"
-    VAL_FEEDBACK_DOMAIN = "val_feedback_domain.md"
-    VAL_FEEDBACK_PROBLEM = "val_feedback_problem.md"
-    PLANNER_CONTEXT = "planner_context.md"
-    PLANNER_CONTEXT_IMAGES = "planner_context_images.md"
-    PLANNER_TASK = "planner_task.md"
-    PLANNER_TRANSLATE_CONTEXT = "planner_translate_context.md"
-    PLANNER_TRANSLATE_CONTEXT_IMAGES = "planner_translate_context_images.md"
-    PLANNER_TRANSLATE_TASK = "planner_translate_task.md"
-    PLAN_FEEDBACK = "plan_feedback.md"
-    ACTION_MAPPING = "action_mapping.md"
 
 
 def get_prompt(*prompts: Prompts) -> str:
@@ -40,37 +11,22 @@ def get_prompt(*prompts: Prompts) -> str:
     return "\n\n".join(parts)
 
 
-domain_prompts = {
-    Domains.BLOCKSWORLD: get_prompt(
-        Prompts.GENERATION_CONTEXT, Prompts.BLOCKSWORLD_DOMAIN
-    ),
-    Domains.RING_AND_PEG: get_prompt(
-        Prompts.GENERATION_CONTEXT, Prompts.RING_AND_PEG_DOMAIN
-    ),
-}
+def get_domain_problem_prompt(domain: Prompts, problem: Prompts) -> str:
+    return get_prompt(Prompts.DOMAIN_AND_PROBLEM).format(
+        domain=get_prompt(domain),
+        problem=get_prompt(problem),
+    )
 
-domain_prompts_tools = {
-    Domains.BLOCKSWORLD: get_prompt(
-        Prompts.GENERATION_CONTEXT_TOOLS, Prompts.BLOCKSWORLD_DOMAIN
-    ),
-    Domains.RING_AND_PEG: get_prompt(
-        Prompts.GENERATION_CONTEXT_TOOLS, Prompts.RING_AND_PEG_DOMAIN
-    ),
-}
 
-domain_prompts_images = {
-    Domains.BLOCKSWORLD: get_prompt(
-        Prompts.GENERATION_CONTEXT_IMAGES, Prompts.BLOCKSWORLD_DOMAIN
-    ),
-    Domains.RING_AND_PEG: get_prompt(
-        Prompts.GENERATION_CONTEXT_IMAGES, Prompts.RING_AND_PEG_DOMAIN
-    ),
-}
-
-problem_prompts = {
-    Domains.BLOCKSWORLD: get_prompt(Prompts.BLOCKSWORLD_PROBLEM),
-    Domains.RING_AND_PEG: get_prompt(Prompts.RING_AND_PEG_PROBLEM),
-}
+def get_domain_problem_and_context_prompt(
+    context: Prompts, domain: Prompts, problem: Prompts
+) -> str:
+    return "\n\n".join(
+        [
+            get_prompt(context),
+            get_domain_problem_prompt(domain, problem),
+        ]
+    )
 
 
 def add_line_numbers(lines: list[str]) -> list[str]:

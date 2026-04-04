@@ -2,9 +2,9 @@ import logging
 from argparse import ArgumentParser
 
 from src.base.pipeline import Tools
+from src.base.schemas import Domains, Problems
 from src.inference import Models
 from src.pipeline import Pipelines, pipelines
-from src.utils.domains import Domains
 from src.utils.logger import configure_logging
 
 if __name__ == "__main__":
@@ -28,6 +28,12 @@ if __name__ == "__main__":
         required=False,
     )
     parser.add_argument(
+        "--problem",
+        choices=[problem.value for problem in Problems],
+        default=Problems.RING_AND_PEG_1,
+        required=False,
+    )
+    parser.add_argument(
         "--ablate_tools",
         help=f"Tools to able from the tool-calling pipeline. Should be given as comma separated list. Available tools are: [{[tool.value for tool in Tools]}]",
         required=False,
@@ -36,9 +42,12 @@ if __name__ == "__main__":
     pipeline = args.pipeline
     model = args.model
     domain = args.domain
-    ablate_tools = str(args.ablate_tools).split(",")
+    problem = args.problem
+    ablate_tools = args.ablate_tools
+    if args.ablate_tools:
+        ablate_tools = "".split(",")
 
     configure_logging(logging.DEBUG)
     logger = logging.getLogger(__name__)
 
-    pipelines[pipeline](model, domain, ablate_tools).run()
+    pipelines[pipeline](model, domain, problem, ablate_tools).run()

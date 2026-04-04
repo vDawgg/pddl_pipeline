@@ -6,15 +6,27 @@ from typing import Literal
 
 import dspy
 
+from src.base.mappings import ACTION_SCHEMA_PROMPTS, DOMAIN_PROMPTS, PROBLEM_PROMPTS
 from src.base.pipeline import FDErrorInfo, PipelineBase
-from src.base.schema import PDDLFiles, PipelineError, Pipelines, Tools
+from src.base.schemas import (
+    Domains,
+    PDDLFiles,
+    PipelineError,
+    Pipelines,
+    Problems,
+    Tools,
+)
 from src.eval.fast_downward import translate_pddl as _translate_pddl
 from src.eval.val import get_syntax_mistakes_domain as _get_syntax_mistakes_domain
 from src.eval.val import get_syntax_mistakes_problem as _get_syntax_mistakes_problem
 from src.eval.val import is_domain_valid, is_problem_valid
 from src.inference import Models
-from src.utils.domains import Domains
-from src.utils.prompts import Prompts, add_line_numbers, get_prompt
+from src.utils.prompts import (
+    Prompts,
+    add_line_numbers,
+    get_domain_problem_prompt,
+    get_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +68,7 @@ class ToolCallPipeline(PipelineBase):
         self,
         model: Models,
         domain: Domains,
+        problem: Problems,
         ablate_tools: list[Tools] | None = None,
         pipeline: Pipelines | None = None,
         optimized_program: str | None = None,
@@ -63,6 +76,7 @@ class ToolCallPipeline(PipelineBase):
         super().__init__(
             model,
             domain,
+            problem,
             ablate_tools,
             pipeline or Pipelines.TOOL_CALL,
             optimized_program,
@@ -191,10 +205,9 @@ class ToolCallPipeline(PipelineBase):
         with open(temp_file.name, "w") as f:
             file_contents[start : end + 1] = [r + "\n" for r in new.split("\n")]
             f.write("".join(file_contents))
-        # TODO: Think about providing the would be content after the change in the message here as well
+        # TODO: Think about providing the would-be content after the change in the message here as well
         if "domain" in str(file):
             err_info = _get_syntax_mistakes_domain(Path(temp_file.name))
-            logger.debug(f"Error Info domain after edit: {err_info.errors}")
             if err_info.num_errors > 0:
                 return (
                     "Found syntax errors! Your edit was not applied to the file!\n"
@@ -204,7 +217,6 @@ class ToolCallPipeline(PipelineBase):
             err_info = _get_syntax_mistakes_problem(
                 Path(self.domain), Path(temp_file.name)
             )
-            logger.debug(f"Error Info problem after edit: {err_info.errors}")
             if err_info.num_errors > 0:
                 return (
                     "Found syntax errors! Your edit was not applied to the file!\n"
@@ -309,17 +321,20 @@ class ToolCallPipeline(PipelineBase):
             return "Could not generate feedback, as no plan has been generated to provide feedback on."
         with open(self.vars.plan_file) as f:
             plan = f.read()
+
         plan_feedback_prompt = base_plan_feedback_prompt.format(
-            # TODO: We need to update this to accept/gather other domain/problem instructions than ring_and_peg in the future
-            task=get_prompt(Prompts.RING_AND_PEG),
+            task=self.vars.task_description,
             plan=plan,
         )
         return self.plan_feedback_module(task_and_plan=plan_feedback_prompt).feedback
 
     def forward(
-        self, task_description: str, scene: dspy.Image | None = None
+        self, task_description: str, action_schema: str, scene: dspy.Image | None = None
     ) -> dspy.Prediction:
         error = None
+        # Make the task description instance and thread-local, so it can be referenced
+        # by get_plan_feedback when when running optimization
+        self.vars.task_description = task_description
         self.generate_pddl_module(
             task_description=task_description,
         )
@@ -337,16 +352,19 @@ class ToolCallPipeline(PipelineBase):
                 )
                 error = plan.to_pipeline_error()
             else:
-                # FIXME: This is somehow overwriting the rest of the debug output
                 self.vars.plan_file = plan
                 # Log history before gathering new instance below
                 self.log_and_clear_history()
                 # Map plan to action schema of robot
                 base_action_mapping_prompt = get_prompt(Prompts.ACTION_MAPPING)
                 with open(self.vars.plan_file) as f:
+                    # TODO: This should really be a tool call itself. While there is no real need to show
+                    #       the final mapping to the model, the model should still have the possibility to
+                    #       get feedback when the mapping process fails, which we have to assume will happen.
                     action_mapping_prompt = base_action_mapping_prompt.format(
                         domain=self.read_pddl_file(PDDLFiles.DOMAIN),
                         plan=f.read(),
+                        action_schema=action_schema,
                     )
                     plan_mapping_out = self.action_mapping_module(
                         plan_and_actions=action_mapping_prompt
@@ -359,12 +377,19 @@ class ToolCallPipeline(PipelineBase):
     ## MODULE OPTIMIZATION FUNCTIONS
 
     def compile_module(self):
-        return self._compile_module()
+        return self._optimize_program()
 
     ## PIPELINE EXECUTION
 
     def _run_impl(self):
-        prediction = self(get_prompt(Prompts.RING_AND_PEG))
+        prediction = self(
+            # Specific to thesis domains, as never called by the optimization functions
+            task_description=get_domain_problem_prompt(
+                DOMAIN_PROMPTS[self.domain],
+                PROBLEM_PROMPTS[self.problem],
+            ),
+            action_schema=get_prompt(ACTION_SCHEMA_PROMPTS[self.domain]),
+        )
         token_usage = prediction.get_lm_usage()
         assert token_usage is not None, "token_usage is None"
         token_usage = token_usage[f"openai/{self._model_config.api_model_name}"]

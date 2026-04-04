@@ -8,6 +8,4 @@
 
 # Action Schema
 
-(move to)
-(pick)
-(place)
+{action_schema}
