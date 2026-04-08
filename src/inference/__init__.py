@@ -44,6 +44,7 @@ class Models(StrEnum):
     QWEN_25_CODER_14B = auto()
     GEMMA_3_12B = auto()
     GEMMA_3_27B = auto()
+    GEMMA_4 = auto()
     QWEN_3_CODER = auto()
     QWEN_3_CODER_NEXT = auto()
     GPT_OSS = auto()
@@ -81,6 +82,10 @@ MODEL_CONFIGS: dict[Models, ModelConfig] = {
     Models.GEMMA_3_27B: ModelConfig(
         api_model_name="google/gemma-3-27b-it",
         provider=Provider.OPENROUTER,
+    ),
+    Models.GEMMA_4: ModelConfig(
+        api_model_name="google/gemma-4",
+        provider=Provider.LOCAL,
     ),
     Models.QWEN_3_CODER: ModelConfig(
         api_model_name="qwen/qwen3-coder",

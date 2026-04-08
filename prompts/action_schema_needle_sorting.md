@@ -1,0 +1,3 @@
+(move ?to)
+(pick)
+(place)
