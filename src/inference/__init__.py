@@ -48,7 +48,7 @@ class Models(StrEnum):
     QWEN_3_CODER = auto()
     QWEN_3_CODER_NEXT = auto()
     GPT_OSS = auto()
-    GPT_OSS_22b = auto()
+    GPT_OSS_22B = auto()
     GPT_OSS_122B = auto()
     GPT_52 = auto()
     GPT_5_NANO = auto()
@@ -102,6 +102,10 @@ MODEL_CONFIGS: dict[Models, ModelConfig] = {
     Models.GPT_OSS: ModelConfig(
         api_model_name="gpt-oss",
         provider=Provider.LOCAL,
+    ),
+    Models.GPT_OSS_22B: ModelConfig(
+        api_model_name="openai/gpt-oss-20b:nitro",
+        provider=Provider.OPENROUTER,
     ),
     Models.GPT_OSS_122B: ModelConfig(
         api_model_name="openai/gpt-oss-120b:nitro",
