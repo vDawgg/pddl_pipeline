@@ -1,3 +1,3 @@
-(move arm to)
-(pick arm)
-(place arm)
+(move ?arm ?to)
+(pick ?arm)
+(place ?arm)

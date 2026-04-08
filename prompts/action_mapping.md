@@ -9,3 +9,7 @@
 # Action Schema
 
 {action_schema}
+
+# Object Names
+
+{object_names}

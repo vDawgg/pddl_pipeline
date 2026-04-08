@@ -9,10 +9,6 @@
         (holding ?x - ring)
     )
 
-    ; NOTE: The actions below can be defined with more params than the original methods written in python.
-    ;       The model should later be instructed to build up the actions with the minimum of the actions
-    ;       defined for the original python functions with the caveat that additional params will not be
-    ;       passed to the function in production.
     (:action move
         :parameters (?to - peg)
         :precondition (and (not (at ?to)))

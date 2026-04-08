@@ -42,9 +42,13 @@ class DSPyToolCallPipelineFull(ToolCallPipeline):
         pipeline: Pipelines | None = None,
         optimized_program: str | None = None,
     ):
-        dspy.Module.__init__(self)
-        ToolCallPipeline.__init__(
-            self, model, domain, problem, pipeline=pipeline or Pipelines.TOOL_CALL_FULL
+        super().__init__(
+            model,
+            domain,
+            problem,
+            ablate_tools,
+            pipeline or Pipelines.TOOL_CALL_FULL,
+            optimized_program,
         )
 
         key_path = project_root / self._model_config.key_file
@@ -69,6 +73,7 @@ class DSPyToolCallPipelineFull(ToolCallPipeline):
                 self.get_syntax_mistakes_problem,
                 self.translate_pddl,
                 self.generate_plan,
+                self.get_plan_feedback,
             ],
             max_iters=20,
         )

@@ -516,7 +516,7 @@ def generate_plan(domain_file: Path, problem_file: Path) -> tuple[Path, ExitCode
             "--plan-file",
             plan_file.name,
             "--alias",
-            "seq-sat-lama-2011",
+            "lama-first",
             domain_file,
             problem_file,
         ],
@@ -566,8 +566,6 @@ def parse_error(
 ) -> FDErrorInfo:
     if is_translate_error(fd_code):
         return translate_parser.parse_translate_error(planner_output, fd_code)
-    # TODO: We should also incorporate this information when successfully generating a plan
-    #       as a last quality measure as well.
     elif is_unsolvable(fd_code):
         fallback = FDErrorInfo(
             fd_code,
@@ -600,6 +598,7 @@ def parse_error(
                 return fallback
         else:
             return fallback
+    logger.debug(f"Unhandled error-code: {fd_code}")
     # Fall back which we should never really reach
     return FDErrorInfo(
         fd_code,

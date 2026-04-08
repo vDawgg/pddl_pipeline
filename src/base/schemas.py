@@ -72,7 +72,7 @@ class Prompts(StrEnum):
     GENERATION_CONTEXT_IMAGES = "generation_context_images.md"
     GENERATION_CONTEXT_PLAN_FEEDBACK = "generation_context_plan_feedback.md"
     GENERATION_CONTEXT_ACTION_MAPPING = "generation_context_action_mapping.md"
-    RING_AND_PEG_DOMAIN = "ring_and_peg.md"
+    RING_AND_PEG_DOMAIN = "ring_and_peg_domain.md"
     RING_AND_PEG_1 = "ring_and_peg_1.md"
     RING_AND_PEG_2 = "ring_and_peg_2.md"
     RING_AND_PEG_3 = "ring_and_peg_3.md"
@@ -96,6 +96,8 @@ class Prompts(StrEnum):
     ACTION_MAPPING = "action_mapping.md"
     ACTION_SCHEMA_RING_AND_PEG = "action_schema_ring_and_peg.md"
     ACTION_SCHEMA_NEEDLE_TRANSFER = "action_schema_needle_transfer.md"
+    OBJECT_NAMES_RING_AND_PEG = "object_names_ring_and_peg.md"
+    OBJECT_NAMES_NEEDLE_TRANSFER = "object_names_needle_transfer.md"
 
 
 class Domains(StrEnum):

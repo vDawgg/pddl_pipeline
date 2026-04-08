@@ -89,17 +89,28 @@ class ToolCallImagePipeline(ToolCallPipeline):
         :return: Feedback on the physical/logical feasibility of the generated plan.
         :rtype: str
         """
+        self.vars.get_plan_feedback_calls += 1
         base_plan_feedback_prompt = get_prompt(Prompts.PLAN_FEEDBACK)
         if self.vars.plan_file is None:
             return "Could not generate feedback, as no plan has been generated to provide feedback on."
+        base_action_mapping_prompt = get_prompt(Prompts.ACTION_MAPPING)
         with open(self.vars.plan_file) as f:
-            plan = f.read()
+            action_mapping_prompt = base_action_mapping_prompt.format(
+                domain=self.read_pddl_file(PDDLFiles.DOMAIN),
+                plan=f.read(),
+                action_schema=self.vars.action_schema,
+                object_names=self.vars.object_names,
+            )
+            plan_mapping_out = self.action_mapping_module(
+                plan_and_actions=action_mapping_prompt
+            )
         plan_feedback_prompt = base_plan_feedback_prompt.format(
             task=get_domain_problem_prompt(
                 DOMAIN_PROMPTS[self.domain],
                 PROBLEM_PROMPTS[self.problem],
             ),
-            plan=plan,
+            plan=plan_mapping_out.mapped_plan,
+            action_schema=self.vars.action_schema,
         )
         return self.plan_feedback_module(
             scene=dspy.Image(str(images_dir / IMAGES[self.problem])),
@@ -107,9 +118,16 @@ class ToolCallImagePipeline(ToolCallPipeline):
         ).feedback
 
     def forward(
-        self, task_description: str, action_schema: str, scene: dspy.Image | None = None
+        self,
+        task_description: str,
+        action_schema: str,
+        object_names: str,
+        scene: dspy.Image | None = None,
     ) -> dspy.Prediction:
         error = None
+        self.vars.task_description = task_description
+        self.vars.action_schema = action_schema
+        self.vars.object_names = object_names
         self.generate_pddl_module(
             scene=scene,
             task_description=task_description,
@@ -138,6 +156,7 @@ class ToolCallImagePipeline(ToolCallPipeline):
                         domain=self.read_pddl_file(PDDLFiles.DOMAIN),
                         plan=f.read(),
                         action_schema=action_schema,
+                        object_names=self.vars.object_names,
                     )
                     plan_mapping_out = self.action_mapping_module(
                         scene=dspy.Image(str(images_dir / IMAGES[self.problem])),

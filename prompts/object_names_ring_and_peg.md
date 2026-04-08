@@ -1,0 +1,10 @@
+red_ring
+green_ring
+blue_ring
+yellow_ring
+pink_ring
+red_peg
+green_peg
+blue_peg
+yellow_peg
+pink_peg
