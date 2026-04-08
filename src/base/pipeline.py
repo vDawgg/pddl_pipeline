@@ -3,6 +3,7 @@ import logging
 import shutil
 import threading
 import time
+import traceback
 from abc import abstractmethod
 from enum import Enum
 from pathlib import Path
@@ -86,6 +87,8 @@ class ThreadSafeClassVars(threading.local):
         self.plan_file: Path | None = None
         self.log_file: Path | None = None
         self.task_description: str | None = None
+        self.action_schema: str | None = None
+        self.object_names: str | None = None
 
     def reset(self, name: str):
         self.num_model_calls = 0
@@ -104,6 +107,8 @@ class ThreadSafeClassVars(threading.local):
         self.plan_file = None
         self.log_file = logs_dir / f"{name}_{get_current_timestamp()}_{uuid4().hex}.log"
         self.task_description = None
+        self.action_schema = None
+        self.object_names = None
 
 
 class PipelineBase(dspy.Module):
@@ -182,10 +187,10 @@ class PipelineBase(dspy.Module):
         start = time.perf_counter()
         try:
             result = self._run_impl()
-        except Exception as e:
+        except Exception:
             self.elapsed_time = time.perf_counter() - start
             logger.debug("Caught exception while running inference:")
-            logger.debug(e)
+            logger.debug(traceback.format_exc())
             result = self.create_result(error=PipelineError.MODEL_FAILURE)
         else:
             self.vars.elapsed_time = time.perf_counter() - start
@@ -327,21 +332,10 @@ class PipelineBase(dspy.Module):
     ## FASTDOWNWARD CLASS UTILITIES
 
     def _save_plan(self, plan_file: Path) -> Path:
-        latest_plan = None
-        for i in range(1, 100):
-            candidate_path = Path(f"{plan_file}.{i}")
-            if candidate_path.is_file():
-                latest_plan = candidate_path
-            else:
-                break
-        if latest_plan is None:
-            raise FileNotFoundError(
-                f"Fast Downward reported success but no plan file found at {plan_file}.* "
-            )
         plan_name = (
             plans_dir / f"{self.name}_{get_current_timestamp()}_{uuid4().hex}.plan"
         )
-        shutil.copyfile(latest_plan, plan_name)
+        shutil.copyfile(plan_file, plan_name)
         return plan_name
 
     def _generate_plan(

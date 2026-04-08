@@ -1,0 +1,9 @@
+needle
+red_ring
+green_ring
+blue_ring
+pink_ring
+yellow_ring
+goal
+right_arm
+left_arm

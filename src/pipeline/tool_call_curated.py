@@ -48,7 +48,9 @@ class DSPyToolCallPipelineCurated(ToolCallPipeline):
             model,
             domain,
             problem,
-            pipeline=pipeline or Pipelines.TOOL_CALL_CURATED,
+            ablate_tools,
+            pipeline or Pipelines.TOOL_CALL_CURATED,
+            optimized_program,
         )
 
         key_path = project_root / self._model_config.key_file
@@ -73,6 +75,7 @@ class DSPyToolCallPipelineCurated(ToolCallPipeline):
                 self.get_syntax_mistakes_problem,
                 self.translate_pddl,
                 self.generate_plan,
+                self.get_plan_feedback,
             ],
             max_iters=20,
         )

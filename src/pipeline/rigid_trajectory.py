@@ -3,7 +3,12 @@ from pathlib import Path
 
 import dspy
 
-from src.base.mappings import ACTION_SCHEMA_PROMPTS, DOMAIN_PROMPTS, PROBLEM_PROMPTS
+from src.base.mappings import (
+    ACTION_SCHEMA_PROMPTS,
+    DOMAIN_PROMPTS,
+    OBJECT_NAME_PROMPTS,
+    PROBLEM_PROMPTS,
+)
 from src.base.pipeline import PipelineBase
 from src.base.schemas import Domains, PDDLFiles, PipelineError, Pipelines, Problems
 from src.eval.fast_downward import ExitCodes, FDErrorInfo
@@ -239,17 +244,33 @@ class RigidTrajectoryPipeline(PipelineBase):
 
     def get_plan_feedback(
         self,
+        domain_file: Path,
         plan_file: Path,
+        action_schema: str,
+        object_names: str,
     ) -> str:
         base_plan_feedback_prompt = get_prompt(Prompts.PLAN_FEEDBACK)
+        base_action_mapping_prompt = get_prompt(Prompts.ACTION_MAPPING)
         with open(plan_file) as f:
             plan = f.read()
+        with open(domain_file) as f:
+            domain = f.read()
+        action_mapping_prompt = base_action_mapping_prompt.format(
+            domain=domain,
+            plan=plan,
+            action_schema=action_schema,
+            object_names=object_names,
+        )
+        plan_mapping_out = self.action_mapping_module(
+            plan_and_actions=action_mapping_prompt
+        )
         plan_feedback_prompt = base_plan_feedback_prompt.format(
             task=get_domain_problem_prompt(
                 DOMAIN_PROMPTS[self.domain],
                 PROBLEM_PROMPTS[self.problem],
             ),
-            plan=plan,
+            plan=plan_mapping_out.mapped_plan,
+            action_schema=action_schema,
         )
         self.vars.get_plan_feedback_calls += 1
         return self.plan_feedback_module(task_and_plan=plan_feedback_prompt).feedback
@@ -259,10 +280,17 @@ class RigidTrajectoryPipeline(PipelineBase):
         domain_file: Path,
         problem_file: Path,
         plan_file: Path,
+        action_schema: str,
+        object_names: str,
         num_tries: int = 5,
     ) -> Path | None:
         for i in range(num_tries):
-            feedback = self.get_plan_feedback(plan_file)
+            feedback = self.get_plan_feedback(
+                domain_file,
+                plan_file,
+                action_schema,
+                object_names,
+            )
             self.log_and_clear_history()
 
             domain_content = self._read_pddl_file(domain_file)
@@ -378,6 +406,7 @@ class RigidTrajectoryPipeline(PipelineBase):
         domain_description: str,
         problem_description: str,
         action_schema: str,
+        object_names: str,
     ) -> dspy.Prediction:
         self.vars.num_model_calls += 1
         domain_result = self.generate_domain_module(
@@ -420,7 +449,11 @@ class RigidTrajectoryPipeline(PipelineBase):
         self.vars.plan_file = planner_output
 
         plan_file = self.incorporate_plan_feedback(
-            domain_file, problem_file, planner_output
+            domain_file,
+            problem_file,
+            planner_output,
+            action_schema,
+            object_names,
         )
         self.vars.plan_file = plan_file
         self.log_and_clear_history()
@@ -437,6 +470,7 @@ class RigidTrajectoryPipeline(PipelineBase):
                 domain=self._read_pddl_file(domain_file),
                 plan=f.read(),
                 action_schema=action_schema,
+                object_names=object_names,
             )
             plan_mapping_out = self.action_mapping_module(
                 plan_and_actions=action_mapping_prompt
@@ -458,6 +492,7 @@ class RigidTrajectoryPipeline(PipelineBase):
                 problem=get_prompt(PROBLEM_PROMPTS[self.problem])
             ),
             action_schema=get_prompt(ACTION_SCHEMA_PROMPTS[self.domain]),
+            object_names=get_prompt(OBJECT_NAME_PROMPTS[self.domain]),
         )
         token_usage = prediction.get_lm_usage()
         assert token_usage is not None

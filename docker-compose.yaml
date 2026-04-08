@@ -21,7 +21,7 @@ x-llama-cpp-base: &llama-cpp-base
     start_period: 120s
 
 x-llama-cpp-common-env: &llama-cpp-common-env
-  LLAMA_ARG_CTX_SIZE: 32768
+  LLAMA_ARG_CTX_SIZE: 128000
   LLAMA_ARG_N_GPU_LAYERS: 99
   LLAMA_ARG_PORT: 8080
 
@@ -135,6 +135,23 @@ services:
       <<: *llama-cpp-common-env
       LLAMA_ARG_HF_REPO: unsloth/gpt-oss-20b-GGUF:q4_k_m
 
+  gemma_4:
+    <<: *llama-cpp-base
+    profiles: ["gemma-4"]
+    command:
+      - "--jinja"
+      - "--temp"
+      - "1.0"
+      - "--top-k"
+      - "64"
+      - "--top-p"
+      - "0.95"
+      - "--flash-attn"
+      - "on"
+    environment:
+      <<: *llama-cpp-common-env
+      LLAMA_ARG_HF_REPO: unsloth/gemma-4-E4B-it-GGUF
+
   pipeline_qwen_25_coder:
     <<: *pipeline-base
     profiles: ["qwen-2.5-coder"]
@@ -184,3 +201,13 @@ services:
     environment:
       <<: *pipeline-common-env
       EVAL_MODEL: "gpt-oss"
+
+  pipeline_gemma_4:
+    <<: *pipeline-base
+    profiles: ["gemma-4"]
+    depends_on:
+      gpt_oss:
+        condition: service_healthy
+    environment:
+      <<: *pipeline-common-env
+      EVAL_MODEL: "gemma-4"

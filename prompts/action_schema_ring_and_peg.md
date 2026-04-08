@@ -1,3 +1,3 @@
-(move to)
+(move ?to)
 (pick)
 (place)
