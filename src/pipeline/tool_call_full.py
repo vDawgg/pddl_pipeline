@@ -4,7 +4,7 @@ import dspy
 
 from src.base.schemas import Domains, Pipelines, Problems, Tools
 from src.constants import project_root
-from src.eval.fast_downward import FDErrorInfo
+from src.eval.fast_downward import FDErrorInfo, UnsolvabilityFeedback
 from src.inference import Models
 from src.pipeline.tool_call import GeneratePddlSignature, ToolCallPipeline
 
@@ -27,11 +27,17 @@ class DSPyToolCallPipelineFull(ToolCallPipeline):
         elif self.vars.problem_file is None:
             return "Problem file has not yet been created"
         plan_output = self._generate_plan(
-            Path(self.vars.domain_file), Path(self.vars.problem_file)
+            Path(self.vars.domain_file),
+            Path(self.vars.problem_file),
+            UnsolvabilityFeedback.FULL,
         )
         if isinstance(plan_output, FDErrorInfo):
-            return "Fast Downward was unable to generate a plan" + plan_output.to_str()
-        return f"Fast Downward successfully generated a plan under {plan_output}"
+            return (
+                "Fast Downward was unable to generate a plan\n" + plan_output.to_str()
+            )
+        self.vars.plan_file = plan_output
+        with open(plan_output) as f:
+            return f"Fast Downward successfully generated a plan.\n\nGenerated plan:\n{f.read()}"
 
     def __init__(
         self,
