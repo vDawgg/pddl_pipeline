@@ -1,0 +1,1 @@
+There are 3 colored needles (the needle locations are called: red_needle_1, green_needle_1, blue_needle_1) and 3 goals (red_goal, green_goal, blue_goal). The robot arm start out in a default position, while the needles are scattered randomly away from the goal positions. The goal is to move all needles to their matching goals.

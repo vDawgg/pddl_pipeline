@@ -82,6 +82,10 @@ class Prompts(StrEnum):
     NEEDLE_TRANSFER_DOMAIN = "needle_transfer_domain.md"
     NEEDLE_TRANSFER_1 = "needle_transfer_1.md"
     NEEDLE_TRANSFER_2 = "needle_transfer_2.md"
+    NEEDLE_SORTING_DOMAIN = "needle_sorting_domain.md"
+    NEEDLE_SORTING_1 = "needle_sorting_1.md"
+    NEEDLE_SORTING_2 = "needle_sorting_2.md"
+    NEEDLE_SORTING_3 = "needle_sorting_3.md"
     VAL_FEEDBACK_CONTEXT = "val_feedback_context.md"
     VAL_FEEDBACK_CONTEXT_IMAGES = "val_feedback_context_images.md"
     VAL_FEEDBACK_DOMAIN = "val_feedback_domain.md"
@@ -96,13 +100,16 @@ class Prompts(StrEnum):
     ACTION_MAPPING = "action_mapping.md"
     ACTION_SCHEMA_RING_AND_PEG = "action_schema_ring_and_peg.md"
     ACTION_SCHEMA_NEEDLE_TRANSFER = "action_schema_needle_transfer.md"
+    ACTION_SCHEMA_NEEDLE_SORTING = "action_schema_needle_sorting.md"
     OBJECT_NAMES_RING_AND_PEG = "object_names_ring_and_peg.md"
     OBJECT_NAMES_NEEDLE_TRANSFER = "object_names_needle_transfer.md"
+    OBJECT_NAMES_NEEDLE_SORTING = "object_names_needle_sorting.md"
 
 
 class Domains(StrEnum):
     RING_AND_PEG = auto()
     NEEDLE_TRANSFER = auto()
+    NEEDLE_SORTING = auto()
 
 
 class Problems(StrEnum):
@@ -113,6 +120,9 @@ class Problems(StrEnum):
     RING_AND_PEG_5 = auto()
     NEEDLE_TRANSFER_1 = auto()
     NEEDLE_TRANSFER_2 = auto()
+    NEEDLE_SORTING_1 = auto()
+    NEEDLE_SORTING_2 = auto()
+    NEEDLE_SORTING_3 = auto()
 
 
 class Images(StrEnum):
@@ -123,3 +133,6 @@ class Images(StrEnum):
     RING_AND_PEG_5 = "ring_and_peg_5.png"
     NEEDLE_TRANSFER_1 = "needle_transfer_1.png"
     NEEDLE_TRANSFER_2 = "needle_transfer_2.png"
+    NEEDLE_SORTING_1 = "needle_sorting_1.png"
+    NEEDLE_SORTING_2 = "needle_sorting_2.png"
+    NEEDLE_SORTING_3 = "needle_sorting_3.png"
