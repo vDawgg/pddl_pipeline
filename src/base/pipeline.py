@@ -128,6 +128,7 @@ class PipelineBase(dspy.Module):
         self.name = f"{self.domain}_{self.problem}_{self.pipeline}_{self.model.split('/')[-1]}_base"
         self.vars = ThreadSafeClassVars()
         self.ablate_tools = ablate_tools
+        self.max_tokens = 16384
 
         self._model_config = get_model_config(self.model)
         key_path = project_root / self._model_config.key_file
@@ -138,6 +139,7 @@ class PipelineBase(dspy.Module):
             model="openai/" + self._model_config.api_model_name,
             api_key=api_key,
             api_base=self._model_config.base_url,
+            max_tokens=self.max_tokens,
             cache=False,  # Disable DSPy's built-in response caching
         )
         dspy.configure(lm=self.lm, track_usage=True)
@@ -188,7 +190,7 @@ class PipelineBase(dspy.Module):
         try:
             result = self._run_impl()
         except Exception:
-            self.elapsed_time = time.perf_counter() - start
+            self.vars.elapsed_time = time.perf_counter() - start
             logger.debug("Caught exception while running inference:")
             logger.debug(traceback.format_exc())
             result = self.create_result(error=PipelineError.MODEL_FAILURE)
@@ -293,6 +295,7 @@ class PipelineBase(dspy.Module):
                 model="openai/gpt-5.2",
                 api_key=api_key,
                 api_base=reflection_config.base_url,
+                max_tokens=self.max_tokens,
                 temperature=1.0,
                 cache=False,
             ),

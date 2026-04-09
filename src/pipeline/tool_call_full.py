@@ -3,7 +3,6 @@ from pathlib import Path
 import dspy
 
 from src.base.schemas import Domains, Pipelines, Problems, Tools
-from src.constants import project_root
 from src.eval.fast_downward import FDErrorInfo, UnsolvabilityFeedback
 from src.inference import Models
 from src.pipeline.tool_call import GeneratePddlSignature, ToolCallPipeline
@@ -57,18 +56,6 @@ class DSPyToolCallPipelineFull(ToolCallPipeline):
             optimized_program,
         )
 
-        key_path = project_root / self._model_config.key_file
-        if not key_path.exists():
-            raise FileNotFoundError(f"API key file not found: {key_path}")
-        api_key = key_path.read_text().strip().split("\n")[0]
-        self.lm = dspy.LM(
-            model="openai/" + self._model_config.api_model_name,
-            api_key=api_key,
-            api_base=self._model_config.base_url,
-            cache=False,  # Disable DSPy's built-in response caching
-        )
-        dspy.configure(lm=self.lm)
-
         self.generate_pddl_module = dspy.ReAct(
             GeneratePddlSignature,
             tools=[
@@ -81,5 +68,5 @@ class DSPyToolCallPipelineFull(ToolCallPipeline):
                 self.generate_plan,
                 self.get_plan_feedback,
             ],
-            max_iters=20,
+            max_iters=50,
         )
