@@ -35,8 +35,4 @@ COPY ./main.py ./main.py
 COPY ./eval.py ./eval.py
 COPY ./.default-key ./.default-key
 
-CMD uv run eval.py \
-    --iterations ${EVAL_ITERATIONS} \
-    --pipeline ${EVAL_PIPELINE} \
-    --model ${EVAL_MODEL} \
-    --domain ${EVAL_DOMAIN}
+ENTRYPOINT [ "uv", "run", "eval.py" ]

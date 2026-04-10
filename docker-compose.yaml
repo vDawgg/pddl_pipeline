@@ -1,11 +1,6 @@
 x-llama-cpp-base: &llama-cpp-base
   image: ghcr.io/ggml-org/llama.cpp:server-cuda
-  ports:
-    - 8080:8080
-  networks:
-    default:
-      aliases:
-        - inference
+  network_mode: host
   deploy:
     resources:
       reservations:
@@ -25,14 +20,9 @@ x-llama-cpp-common-env: &llama-cpp-common-env
   LLAMA_ARG_N_GPU_LAYERS: 99
   LLAMA_ARG_PORT: 8080
 
-x-pipeline-common-env: &pipeline-common-env
-  SERVER_ADDRESS: "http://inference:8080/v1"
-  EVAL_ITERATIONS: ${EVAL_ITERATIONS}
-  EVAL_PIPELINE: ${EVAL_PIPELINE}
-  EVAL_DOMAIN: ${EVAL_DOMAIN}
-
 x-pipeline-base: &pipeline-base
   build: .
+  network_mode: host
   volumes:
     - ./logs:/app/logs
     - ./pddl:/app/pddl
@@ -40,6 +30,7 @@ x-pipeline-base: &pipeline-base
     - ./results:/app/results
 
 services:
+  ### SERVERS
   qwen_25_coder:
     <<: *llama-cpp-base
     profiles: ["qwen-2.5-coder"]
@@ -152,62 +143,7 @@ services:
       <<: *llama-cpp-common-env
       LLAMA_ARG_HF_REPO: unsloth/gemma-4-E4B-it-GGUF
 
-  pipeline_qwen_25_coder:
+  ### PIPELINES
+  pipeline:
     <<: *pipeline-base
-    profiles: ["qwen-2.5-coder"]
-    depends_on:
-      qwen_25_coder:
-        condition: service_healthy
-    environment:
-      <<: *pipeline-common-env
-      EVAL_MODEL: "qwen-2.5-coder"
-
-  pipeline_qwen_3_vl:
-    <<: *pipeline-base
-    profiles: ["qwen-3-vl"]
-    depends_on:
-      qwen_3_vl:
-        condition: service_healthy
-    environment:
-      <<: *pipeline-common-env
-      EVAL_MODEL: "qwen-3-vl"
-
-  pipeline_qwen_3:
-    <<: *pipeline-base
-    profiles: ["qwen-3"]
-    depends_on:
-      qwen_3:
-        condition: service_healthy
-    environment:
-      <<: *pipeline-common-env
-      EVAL_MODEL: "qwen-3"
-
-  pipeline_gemma3:
-    <<: *pipeline-base
-    profiles: ["gemma3"]
-    depends_on:
-      gemma3:
-        condition: service_healthy
-    environment:
-      <<: *pipeline-common-env
-      EVAL_MODEL: "gemma3"
-
-  pipeline_gpt_oss:
-    <<: *pipeline-base
-    profiles: ["gpt-oss"]
-    depends_on:
-      gpt_oss:
-        condition: service_healthy
-    environment:
-      <<: *pipeline-common-env
-      EVAL_MODEL: "gpt-oss"
-
-  pipeline_gemma_4:
-    <<: *pipeline-base
-    profiles: ["gemma-4"]
-    depends_on:
-      gpt_oss:
-        condition: service_healthy
-    environment:
-      <<: *pipeline-common-env
-      EVAL_MODEL: "gemma-4"
+    profiles: ["pipeline"]
