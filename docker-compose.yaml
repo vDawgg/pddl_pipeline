@@ -31,87 +31,9 @@ x-pipeline-base: &pipeline-base
 
 services:
   ### SERVERS
-  qwen_25_coder:
+  gpt_oss_20b:
     <<: *llama-cpp-base
-    profiles: ["qwen-2.5-coder"]
-    command:
-      - "--jinja"
-      - "--top-k"
-      - "20"
-      - "--top-p"
-      - "0.8"
-      - "--temp"
-      - "0.7"
-      - "--min-p"
-      - "0.0"
-      - "--flash-attn"
-      - "on"
-      - "--presence-penalty"
-      - "1.5"
-    environment:
-      <<: *llama-cpp-common-env
-      LLAMA_ARG_HF_REPO: unsloth/Qwen2.5-Coder-14B-Instruct-128K-GGUF:q4_k_m
-
-  qwen_3_vl:
-    <<: *llama-cpp-base
-    profiles: ["qwen-3-vl"]
-    command:
-      - "--jinja"
-      - "--top-k"
-      - "20"
-      - "--top-p"
-      - "0.8"
-      - "--temp"
-      - "0.7"
-      - "--flash-attn"
-      - "on"
-    environment:
-      <<: *llama-cpp-common-env
-      LLAMA_ARG_HF_REPO: unsloth/Qwen3-VL-8B-Instruct-GGUF:q4_k_m
-
-  qwen_3:
-    <<: *llama-cpp-base
-    profiles: ["qwen_3"]
-    command:
-      - "--jinja"
-      - "--top-k"
-      - "20"
-      - "--min-p"
-      - "0.0"
-      - "--top-p"
-      - "0.95"
-      - "--temp"
-      - "0.6"
-      - "--flash-attn"
-      - "on"
-    environment:
-      <<: *llama-cpp-common-env
-      LLAMA_ARG_HF_REPO: unsloth/Qwen3-14B-GGUF:q4_k_m
-
-  gemma3:
-    <<: *llama-cpp-base
-    profiles: ["gemma3"]
-    command:
-      - "--jinja"
-      - "--temp"
-      - "1.0"
-      - "--repeat-penalty"
-      - "1.0"
-      - "--min-p"
-      - "0.01"
-      - "--top-k"
-      - "64"
-      - "--top-p"
-      - "0.95"
-      - "--flash-attn"
-      - "on"
-    environment:
-      <<: *llama-cpp-common-env
-      LLAMA_ARG_HF_REPO: unsloth/gemma-3-12b-it-GGUF:q5_k_m
-
-  gpt_oss:
-    <<: *llama-cpp-base
-    profiles: ["gpt-oss"]
+    profiles: ["gpt_oss_20b"]
     command:
       - "--jinja"
       - "--temp"
@@ -126,9 +48,26 @@ services:
       <<: *llama-cpp-common-env
       LLAMA_ARG_HF_REPO: unsloth/gpt-oss-20b-GGUF:q4_k_m
 
-  gemma_4:
+  gpt_oss_120b:
     <<: *llama-cpp-base
-    profiles: ["gemma-4"]
+    profiles: ["gpt_oss_120b"]
+    command:
+      - "--jinja"
+      - "--temp"
+      - "1.0"
+      - "--top-k"
+      - "0"
+      - "--top-p"
+      - "1.0"
+      - "--flash-attn"
+      - "on"
+    environment:
+      <<: *llama-cpp-common-env
+      LLAMA_ARG_HF_REPO: unsloth/gpt-oss-120b-GGUF:q4_k_m
+
+  gemma_4_e4b:
+    <<: *llama-cpp-base
+    profiles: ["gemma_4_e4b"]
     command:
       - "--jinja"
       - "--temp"
@@ -141,7 +80,71 @@ services:
       - "on"
     environment:
       <<: *llama-cpp-common-env
-      LLAMA_ARG_HF_REPO: unsloth/gemma-4-E4B-it-GGUF
+      LLAMA_ARG_HF_REPO: unsloth/gemma-4-E4B-it-GGUF:q4_k_m
+
+  gemma_4_31b:
+    <<: *llama-cpp-base
+    profiles: ["gemma_4_31b"]
+    command:
+      - "--jinja"
+      - "--temp"
+      - "1.0"
+      - "--top-k"
+      - "64"
+      - "--top-p"
+      - "0.95"
+      - "--flash-attn"
+      - "on"
+    environment:
+      <<: *llama-cpp-common-env
+      LLAMA_ARG_HF_REPO: unsloth/gemma-4-31B-it-GGUF:q4_k_m
+
+  qwen_35_4b:
+    <<: *llama-cpp-base
+    profiles: ["qwen_35_4b"]
+    command:
+      - "--jinja"
+      - "--temp"
+      - "0.6"
+      - "--top-k"
+      - "20"
+      - "--top-p"
+      - "0.8"
+      - "--min-p"
+      - "0.0"
+      - "--presence-penalty"
+      - "0.0"
+      - "--repeat-penalty"
+      - "1.0"
+      - "--flash-attn"
+      - "on"
+    environment:
+      <<: *llama-cpp-common-env
+      LLAMA_ARG_HF_REPO: unsloth/Qwen3.5-4B-GGUF:q4_k_m
+
+  qwen_35_122b:
+    <<: *llama-cpp-base
+    profiles: ["qwen_35_122b"]
+    command:
+      - "--jinja"
+      - "--temp"
+      - "0.6"
+      - "--top-k"
+      - "20"
+      - "--top-p"
+      - "0.95"
+      - "--min-p"
+      - "0.0"
+      - "--presence-penalty"
+      - "0.0"
+      - "--repeat-penalty"
+      - "1.0"
+      - "--flash-attn"
+      - "on"
+    environment:
+      <<: *llama-cpp-common-env
+      LLAMA_ARG_HF_REPO: unsloth/Qwen3.5-122B-A10B-GGUF:q4_k_m
+
 
   ### PIPELINES
   pipeline:
