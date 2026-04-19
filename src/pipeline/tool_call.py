@@ -114,6 +114,23 @@ class ToolCallPipeline(PipelineBase):
         if optimized_program is not None:
             self.load(optimized_program)
 
+    def map_plan(self, plan_file: Path) -> str:
+        # Map plan to action schema of robot
+        base_action_mapping_prompt = get_prompt(Prompts.ACTION_MAPPING)
+        with open(plan_file) as f:
+            action_mapping_prompt = base_action_mapping_prompt.format(
+                domain=self.read_pddl_file(PDDLFiles.DOMAIN),
+                plan=f.read(),
+                action_schema=self.vars.action_schema,
+                object_names=self.vars.object_names,
+            )
+            plan_mapping_out = self.action_mapping_module(
+                plan_and_actions=action_mapping_prompt
+            )
+        with open(plan_file, "w") as f:
+            f.write(plan_mapping_out.mapped_plan)
+        return plan_mapping_out.mapped_plan
+
     ## TOOLS
 
     def create_pddl_file(self, content: str, pddl_file_type: PDDLFiles) -> str:
@@ -322,22 +339,11 @@ class ToolCallPipeline(PipelineBase):
         self.vars.get_plan_feedback_calls += 1
         if self.vars.plan_file is None:
             return "Could not generate feedback, as no plan has been generated to provide feedback on."
-        # Map plan to action schema of robot to enable better understanding of generated plan
-        base_action_mapping_prompt = get_prompt(Prompts.ACTION_MAPPING)
-        with open(self.vars.plan_file) as f:
-            action_mapping_prompt = base_action_mapping_prompt.format(
-                domain=self.read_pddl_file(PDDLFiles.DOMAIN),
-                plan=f.read(),
-                action_schema=self.vars.action_schema,
-                object_names=self.vars.object_names,
-            )
-            plan_mapping_out = self.action_mapping_module(
-                plan_and_actions=action_mapping_prompt
-            )
+        mapped_plan = self.map_plan(self.vars.plan_file)
         base_plan_feedback_prompt = get_prompt(Prompts.PLAN_FEEDBACK)
         plan_feedback_prompt = base_plan_feedback_prompt.format(
             task=self.vars.task_description,
-            plan=plan_mapping_out.mapped_plan,
+            plan=mapped_plan,
             action_schema=self.vars.action_schema,
         )
         return self.plan_feedback_module(task_and_plan=plan_feedback_prompt).feedback
@@ -361,20 +367,7 @@ class ToolCallPipeline(PipelineBase):
         if self.vars.plan_file is not None:
             # Log history before gathering new instance below
             self.log_and_clear_history()
-            # Map plan to action schema of robot
-            base_action_mapping_prompt = get_prompt(Prompts.ACTION_MAPPING)
-            with open(self.vars.plan_file) as f:
-                action_mapping_prompt = base_action_mapping_prompt.format(
-                    domain=self.read_pddl_file(PDDLFiles.DOMAIN),
-                    plan=f.read(),
-                    action_schema=self.vars.action_schema,
-                    object_names=self.vars.object_names,
-                )
-                plan_mapping_out = self.action_mapping_module(
-                    plan_and_actions=action_mapping_prompt
-                )
-            with open(self.vars.plan_file, "w") as f:
-                f.write(plan_mapping_out.mapped_plan)
+            self.map_plan(self.vars.plan_file)
         elif self.vars.domain_file is None or not is_domain_valid(
             self.vars.domain_file
         ):
@@ -386,11 +379,14 @@ class ToolCallPipeline(PipelineBase):
         else:
             # Generated syntactically correct domain and problem, but no plan.
             plan = self._generate_plan(self.vars.domain_file, self.vars.problem_file)
-            assert isinstance(plan, FDErrorInfo)
-            logger.debug(
-                f"# Failed to generate solvable domain and problem: {plan.error_message}"
-            )
-            error = plan.to_pipeline_error()
+            if isinstance(plan, FDErrorInfo):
+                logger.debug(
+                    f"# Failed to generate solvable domain and problem: {plan.error_message}"
+                )
+                error = plan.to_pipeline_error()
+            else:
+                self.vars.plan_file = plan
+                self.map_plan(self.vars.plan_file)
         return dspy.Prediction(out=error, plan_file=self.vars.plan_file)
 
     ## MODULE OPTIMIZATION FUNCTIONS

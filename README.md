@@ -35,7 +35,7 @@ For inference on local hardware, we provide a set of [llama-cpp-server]() config
 The pipeline can then be started by runninng the command below. Note that the container always runs the eval script for the pipeline and accepts the same arguments as the script when its run locally.
 
 ```bash
-docker compose run --rm pipeline --model gemma_4 --domain ring_and_peg --problem ring_and_peg_1 --pipeline tool_call --iterations 30
+docker compose run --build --rm pipeline --model gemma_4 --domain ring_and_peg --problem ring_and_peg_1 --pipeline tool_call --iterations 30
 ```
 
 Running the pipeline also automatically mounts the results, plans, logs and pddl directories so the artifacts from each run can be referenced later.
