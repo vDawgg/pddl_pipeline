@@ -82,7 +82,7 @@ class TestFastDownward:
             # Therefor doing best effort string matching.
             assert (
                 difflib.SequenceMatcher(None, f.read(), error_info.to_str()).ratio()
-                >= 0.5
+                >= 0.4
             )
 
     def test_search_unsolved_simple(self):

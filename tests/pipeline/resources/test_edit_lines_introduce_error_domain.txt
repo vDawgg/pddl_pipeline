@@ -1,4 +1,4 @@
-Found syntax errors! Your edit was not applied to the file!
+Your edit was not applied to the file, as it would have introduced the following new syntax errors:
 Line 7: (on ?b1 ?b2)
 Error Message: Syntax error in action declaration.
 
