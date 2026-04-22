@@ -1,16 +1,11 @@
 import logging
 import re
 from enum import Enum, StrEnum, auto
-from itertools import product
+from itertools import combinations
 from pathlib import Path
 from subprocess import run
 from tempfile import NamedTemporaryFile
 
-from pddl.core import Action, Domain, Formula, Problem
-from pddl.logic.base import And, BinaryOp, Not, QuantifiedCondition, UnaryOp
-from pddl.logic.predicates import EqualTo, Predicate
-
-from pddl import parse_domain, parse_problem
 from src.base.schemas import PDDLFiles, PipelineError
 
 logger = logging.getLogger(__name__)
@@ -140,28 +135,50 @@ class AbstractionGenerator:
     def __init__(self, domain_file: Path, problem_file: Path):
         self.domain_file = domain_file
         self.problem_file = problem_file
-        self.parsed_domain = parse_domain(self.domain_file)
-        self.parsed_problem = parse_problem(self.problem_file)
+        self._domain_text = domain_file.read_text()
+        self._problem_text = problem_file.read_text()
+        # Extract predicate signatures (name and parameters) from domain
+        self.predicates: dict[str, tuple[str, int]] = (
+            self._extract_predicates_from_domain()
+        )
 
-    def generate_predicate_combinations(self) -> list[list[set[Predicate]]]:
+    def _extract_predicates_from_domain(self) -> dict[str, tuple[str, int]]:
+        predicates: dict[str, tuple[str, int]] = {}
+        match = re.search(
+            r"\(:predicates\s+(.*?)\s*\)(?:\s*\(:|$)", self._domain_text, re.DOTALL
+        )
+        if match is None:
+            return predicates
+        predicates_section = match.group(1)
+        for pred_match in re.finditer(
+            r"\(\s*(\w+(?:-\w+)*)\s+([^)]*\?[^)]*)\s*\)", predicates_section
+        ):
+            pred_name = pred_match.group(1)
+            pred_params = pred_match.group(2)
+            if pred_name not in predicates:
+                predicates[pred_name] = (
+                    f"({pred_name} {pred_params})",
+                    self._domain_text.count(pred_name),
+                )
+        return predicates
+
+    def generate_predicate_combinations(self) -> list[list[str]]:
         """
         Function used for generating all possible predicate combinations that can be
         removed from a pddl domain and problem.
         """
-        predicates = self.parsed_domain.predicates
-        # Iteratively build set of n predicate combinations used for later removal from domain
         predicate_removals = []
-        for i in range(len(predicates)):
-            predicate_lists = [predicates for _ in range(i)]
-            unique_combinations = set()
-            for predicate_combinations in product(*predicate_lists):
-                # Remove all entries where fluents repeat
-                if len(predicate_combinations) == len(set(predicate_combinations)):
-                    unique_combinations.add(frozenset(predicate_combinations))
-            predicate_removals.append(
-                [sorted(set(combo)) for combo in unique_combinations if len(combo) > 0]
-            )
-        return predicate_removals
+        for i in range(1, len(self.predicates) + 1):
+            for combo in combinations(self.predicates.keys(), i):
+                predicate_removals.append(list(combo))
+        # Return predicates sorted by number of predicates in set and total occurences in domain
+        return sorted(
+            predicate_removals,
+            key=lambda combo: (
+                len(combo),
+                sum(self.predicates[pred_name][1] for pred_name in combo),
+            ),
+        )
 
     def build_abstraction(self) -> str | None:
         """
@@ -169,127 +186,35 @@ class AbstractionGenerator:
         removed and check whether removing these predicates makes the task solvable.
         Returns the removed predicate set if the task was made solvable.
         """
-        predicate_subsets = self.generate_predicate_combinations()
-        for predicate_group in predicate_subsets:
-            for predicates_to_remove in predicate_group:
-                removed_predicate_names = {
-                    predicate.name for predicate in predicates_to_remove
-                }
-                domain = self._build_domain(removed_predicate_names)
-                problem = self._build_problem(domain, removed_predicate_names)
-                domain_file = self._write_temp_pddl(str(domain))
-                problem_file = self._write_temp_pddl(str(problem))
-                _, fd_code, _ = generate_plan(domain_file, problem_file)
-                if fd_code == ExitCodes.SUCCESS:
-                    return ", ".join(
-                        sorted(str(predicate) for predicate in predicates_to_remove)
-                    )
+        predicate_combinations = self.generate_predicate_combinations()
+        for predicates_to_remove in predicate_combinations:
+            domain_text = self._remove_predicates_from_text(
+                self._domain_text, predicates_to_remove
+            )
+            problem_text = self._remove_predicates_from_text(
+                self._problem_text, predicates_to_remove
+            )
+            domain_file = self._write_temp_pddl(domain_text)
+            problem_file = self._write_temp_pddl(problem_text)
+            _, fd_code, _ = generate_plan(domain_file, problem_file)
+            if fd_code == ExitCodes.SUCCESS:
+                return ", ".join(
+                    self.predicates[pred_name][0] for pred_name in predicates_to_remove
+                )
         return None
 
-    def _build_domain(self, removed_predicate_names: set[str]) -> Domain:
-        domain = self.parsed_domain
-        predicates = {
-            predicate
-            for predicate in domain.predicates
-            if predicate.name not in removed_predicate_names
-        }
-        actions = set()
-        for action in domain.actions:
-            precondition = self._filter_formula(
-                action.precondition, removed_predicate_names
-            )
-            effect = self._filter_formula(action.effect, removed_predicate_names)
-            # The PDDL lib cant handle None as a precondition.
-            # An empty And() is equivalent to an empty precondition here.
-            if precondition is None:
-                precondition = And()
-            if effect is None:
-                effect = And()
-            actions.add(
-                Action(
-                    name=action.name,
-                    parameters=action.parameters,
-                    precondition=precondition,
-                    effect=effect,
-                )
-            )
-        return Domain(
-            name=domain.name,
-            requirements=domain.requirements,
-            types=domain.types,  # type: ignore
-            constants=domain.constants,
-            predicates=predicates,
-            functions=domain.functions,
-            actions=actions,
-        )
-
-    def _build_problem(
-        self, domain: Domain, removed_predicate_names: set[str]
-    ) -> Problem:
-        problem = self.parsed_problem
-        init = {
-            filtered
-            for formula in problem.init
-            if (filtered := self._filter_formula(formula, removed_predicate_names))
-            is not None
-        }
-        goal = self._filter_formula(problem.goal, removed_predicate_names)
-        if goal is None:
-            goal = And()
-        return Problem(
-            name=problem.name,
-            domain=domain,
-            objects=problem.objects,
-            init=init,
-            goal=goal,
-            metric=problem.metric,
-        )
-
-    def _filter_formula(  # noqa: C901
-        self, formula: Formula | None, removed_predicate_names: set[str]
-    ) -> Formula | None:
-        # Predicates are clustered in formulas when defining e.g. preconditions for
-        # actions or the goal in a task in the pddl library. When removing predicates
-        # from the general predicate list in domains, we also have to make sure such
-        # predicates are no longer mentioned in the domains/problems formulas.
-        if formula is None:
-            return None
-        if isinstance(formula, Predicate):
-            return None if formula.name in removed_predicate_names else formula
-        if isinstance(formula, EqualTo):
-            return formula
-        if isinstance(formula, Not):
-            argument = self._filter_formula(formula.argument, removed_predicate_names)
-            if argument is None:
-                return None
-            return Not(argument)
-        if isinstance(formula, QuantifiedCondition):
-            condition = self._filter_formula(formula.condition, removed_predicate_names)
-            if condition is None:
-                return None
-            return type(formula)(condition, formula.variables)
-        if isinstance(formula, BinaryOp):
-            operands = [
-                self._filter_formula(operand, removed_predicate_names)
-                for operand in formula.operands
-            ]
-            filtered_operands = [operand for operand in operands if operand is not None]
-            if not filtered_operands:
-                return None
-            if len(filtered_operands) != len(formula.operands) and not isinstance(
-                formula, And
-            ):
-                return None
-            return type(formula)(*filtered_operands)
-        if isinstance(formula, UnaryOp):
-            argument = self._filter_formula(formula.argument, removed_predicate_names)
-            if argument is None:
-                return None
-            return type(formula)(argument)
-        return formula
+    def _remove_predicates_from_text(
+        self, pddl_text: str, predicates_to_remove: list[str]
+    ) -> str:
+        for pred_name in predicates_to_remove:
+            pattern_negated = rf"\(\s*not\s+\(\s*{re.escape(pred_name)}\s+[^)]*\)\s*\)"
+            pddl_text = re.sub(pattern_negated, "", pddl_text)
+            pattern_direct = rf"\(\s*{re.escape(pred_name)}\s+[^)]*\)"
+            pddl_text = re.sub(pattern_direct, "", pddl_text)
+        return pddl_text
 
     def _write_temp_pddl(self, pddl_text: str) -> Path:
-        temp_file = NamedTemporaryFile(delete=False, mode="w", suffix=".pddl")
+        temp_file = NamedTemporaryFile(delete=False, mode="w")
         temp_file.write(pddl_text)
         temp_file.flush()
         temp_file.close()
