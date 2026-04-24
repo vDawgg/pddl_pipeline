@@ -296,6 +296,7 @@ class PipelineBase(dspy.Module):
                 temperature=1.0,
                 max_tokens=32000,
                 api_base=reflection_config.base_url,
+                api_key=api_key,
                 cache=False,
             ),
         )

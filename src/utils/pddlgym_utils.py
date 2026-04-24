@@ -91,7 +91,7 @@ def make_example(
         object_names=get_object_names_prompt(object_names_prompt_file),
         domain_name=domain_name,
         problem_index=problem_idx,
-    ).with_inputs("task_description", "action_schema")
+    ).with_inputs("task_description", "action_schema", "object_names")
 
 
 def make_ds(
