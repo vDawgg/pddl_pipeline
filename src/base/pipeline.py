@@ -292,11 +292,10 @@ class PipelineBase(dspy.Module):
             num_threads=10,
             reflection_minibatch_size=10,
             reflection_lm=dspy.LM(
-                model="openai/gpt-5.2",
-                api_key=api_key,
-                api_base=reflection_config.base_url,
-                max_tokens=self.max_tokens,
+                model="openai/gpt-5",
                 temperature=1.0,
+                max_tokens=32000,
+                api_base=reflection_config.base_url,
                 cache=False,
             ),
         )
