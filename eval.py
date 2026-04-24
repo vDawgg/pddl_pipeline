@@ -71,7 +71,14 @@ if __name__ == "__main__":
     configure_logging(logging.INFO)
     logger = logging.getLogger(__name__)
 
-    if optimize and pipeline in [Pipelines.TOOL_CALL, Pipelines.RIGID_TRAJECTORY]:
+    optimizable = [
+        Pipelines.TOOL_CALL,
+        Pipelines.TOOL_CALL_ABSTRACTION,
+        Pipelines.TOOL_CALL_CURATED,
+        Pipelines.TOOL_CALL_FULL,
+        Pipelines.RIGID_TRAJECTORY,
+    ]
+    if optimize and pipeline in optimizable:
         pipelines[pipeline](model, domain, problem).compile_module()
     else:
         results_file = pipelines[pipeline](
