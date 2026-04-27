@@ -291,6 +291,7 @@ class PipelineBase(dspy.Module):
             metric=self._pddl_generation_metric,
             num_threads=10,
             reflection_minibatch_size=10,
+            log_dir=(logs_dir / "gepa").as_posix(),
             reflection_lm=dspy.LM(
                 model="openai/gpt-5",
                 temperature=1.0,
@@ -302,11 +303,13 @@ class PipelineBase(dspy.Module):
         )
 
         trainset, valset = make_ds(separate_prompts=separate_prompts)
-        optimized_program = teleprompter.compile(
-            self,
-            trainset=trainset,
-            valset=valset,
-        )
+        # Do not capture history to avoid OOM issues during optimization runs
+        with dspy.context(disable_history=True):
+            optimized_program = teleprompter.compile(
+                self,
+                trainset=trainset,
+                valset=valset,
+            )
 
         program_name = f"optimized_{self.pipeline}_{self.model}.json"
         optimized_program.save(program_name)
@@ -391,6 +394,8 @@ class PipelineBase(dspy.Module):
         Log interaction history in one shot and clear everything after to always get interactions from last run only
         """
         # Code below adapted from pretty_print_history from dspy
+        if len(self.history) == 0:
+            return
         item = self.history[-1]
         messages = item["messages"] or [{"role": "user", "content": item["prompt"]}]
         outputs = item["outputs"]
