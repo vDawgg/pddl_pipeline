@@ -26,11 +26,8 @@ from src.base.schemas import (
     Tools,
 )
 from src.constants import (
-    generated_pddl_dir,
     logs_dir,
-    plans_dir,
     project_root,
-    results_dir,
 )
 from src.eval.fast_downward import (
     ExitCodes,
@@ -82,10 +79,10 @@ class ThreadSafeClassVars(threading.local):
         self.get_plan_feedback_calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
-        self.domain_file: Path | None = None
-        self.problem_file: Path | None = None
-        self.plan_file: Path | None = None
-        self.log_file: Path | None = None
+        self.domain_file: str | None = None
+        self.problem_file: str | None = None
+        self.plan_file: str | None = None
+        self.log_file: str | None = None
         self.task_description: str | None = None
         self.action_schema: str | None = None
         self.object_names: str | None = None
@@ -105,7 +102,7 @@ class ThreadSafeClassVars(threading.local):
         self.domain_file = None
         self.problem_file = None
         self.plan_file = None
-        self.log_file = logs_dir / f"{name}_{get_current_timestamp()}_{uuid4().hex}.log"
+        self.log_file = f"./logs/{name}_{get_current_timestamp()}_{uuid4().hex}.log"
         self.task_description = None
         self.action_schema = None
         self.object_names = None
@@ -205,12 +202,12 @@ class PipelineBase(dspy.Module):
     def _run_impl(self) -> PipelineResult:
         pass
 
-    def run_eval(self, iterations: int) -> Path:
+    def run_eval(self, iterations: int) -> str:
         results: list[PipelineResult] = []
         for _ in tqdm(range(iterations), desc="Running Evaluation"):
             results.append(self.run())
         results_name = (
-            results_dir / f"{self.name}_{get_current_timestamp()}_{uuid4().hex}.csv"
+            f"./results/{self.name}_{get_current_timestamp()}_{uuid4().hex}.csv"
         )
 
         def serialize_value(v):
@@ -275,7 +272,7 @@ class PipelineBase(dspy.Module):
         )
 
     def _optimize_program(self, separate_prompts: bool = False):
-        log_file = logs_dir / f"{self.name}_optimization_{get_current_timestamp()}.log"
+        log_file = f"./logs/{self.name}_optimization_{get_current_timestamp()}.log"
         file_handler = add_file_handler(log_file)
         start = time.perf_counter()
         logger.info(f"Starting optimization for {self.name}")
@@ -337,19 +334,17 @@ class PipelineBase(dspy.Module):
 
     ## FASTDOWNWARD CLASS UTILITIES
 
-    def _save_plan(self, plan_file: Path) -> Path:
-        plan_name = (
-            plans_dir / f"{self.name}_{get_current_timestamp()}_{uuid4().hex}.plan"
-        )
+    def _save_plan(self, plan_file: Path) -> str:
+        plan_name = f"./plans/{self.name}_{get_current_timestamp()}_{uuid4().hex}.plan"
         shutil.copyfile(plan_file, plan_name)
         return plan_name
 
     def _generate_plan(
         self,
-        domain_file: Path,
-        problem_file: Path,
+        domain_file: str,
+        problem_file: str,
         unsolvability_feedback: UnsolvabilityFeedback = UnsolvabilityFeedback.SIMPLE,
-    ) -> FDErrorInfo | Path:
+    ) -> FDErrorInfo | str:
         plan_file, fd_code, output = generate_plan(domain_file, problem_file)
         if (
             fd_code == ExitCodes.SUCCESS
@@ -368,22 +363,21 @@ class PipelineBase(dspy.Module):
     def _write_pddl_file(
         self,
         pddl: str,
-        file: Path | None = None,
+        file: str | None = None,
         pddl_file_type: PDDLFiles | None = None,
-    ) -> Path:
+    ) -> str:
         assert file or pddl_file_type, (
             "Specify either the file to write to or the type of the PDDL file"
         )
         file_path = (
             file
-            or generated_pddl_dir
-            / f"{self.domain}_{pddl_file_type}_{self.name}_{get_current_timestamp()}_{uuid4().hex}.pddl"
+            or f"./pddl/generated/{self.domain}_{pddl_file_type}_{self.name}_{get_current_timestamp()}_{uuid4().hex}.pddl"
         )
         with open(file_path, "w") as f:
             f.write(pddl)
         return file_path
 
-    def _read_pddl_file(self, pddl_file: Path) -> str:
+    def _read_pddl_file(self, pddl_file: str) -> str:
         with open(pddl_file) as f:
             return f.read()
 

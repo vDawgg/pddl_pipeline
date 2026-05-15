@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 import dspy
 
@@ -169,7 +168,7 @@ class RigidTrajectoryPipeline(PipelineBase):
 
     def fix_domain(
         self,
-        domain_file: Path,
+        domain_file: str,
         num_tries: int = 5,
     ):
         for i in range(num_tries):
@@ -192,8 +191,8 @@ class RigidTrajectoryPipeline(PipelineBase):
 
     def fix_problem(
         self,
-        domain_file: Path,
-        problem_file: Path,
+        domain_file: str,
+        problem_file: str,
         num_tries: int = 5,
     ):
         for i in range(num_tries):
@@ -219,8 +218,8 @@ class RigidTrajectoryPipeline(PipelineBase):
 
     def fix_plan_not_found(
         self,
-        domain_file: Path,
-        problem_file: Path,
+        domain_file: str,
+        problem_file: str,
     ):
         domain_content = self._read_pddl_file(domain_file)
         problem_content = self._read_pddl_file(problem_file)
@@ -244,8 +243,8 @@ class RigidTrajectoryPipeline(PipelineBase):
 
     def get_plan_feedback(
         self,
-        domain_file: Path,
-        plan_file: Path,
+        domain_file: str,
+        plan_file: str,
         action_schema: str,
         object_names: str,
     ) -> str:
@@ -277,13 +276,13 @@ class RigidTrajectoryPipeline(PipelineBase):
 
     def incorporate_plan_feedback(
         self,
-        domain_file: Path,
-        problem_file: Path,
-        plan_file: Path,
+        domain_file: str,
+        problem_file: str,
+        plan_file: str,
         action_schema: str,
         object_names: str,
         num_tries: int = 5,
-    ) -> Path | None:
+    ) -> str | None:
         for i in range(num_tries):
             feedback = self.get_plan_feedback(
                 domain_file,
@@ -348,8 +347,8 @@ class RigidTrajectoryPipeline(PipelineBase):
 
     def fix_parsing_error(
         self,
-        domain_file: Path,
-        problem_file: Path,
+        domain_file: str,
+        problem_file: str,
         planner_output: FDErrorInfo,
     ):
         if planner_output.file == PDDLFiles.DOMAIN:
@@ -371,17 +370,17 @@ class RigidTrajectoryPipeline(PipelineBase):
 
     def fix_planning(
         self,
-        domain_file: Path,
-        problem_file: Path,
+        domain_file: str,
+        problem_file: str,
         num_tries: int = 5,
-    ) -> FDErrorInfo | Path:
+    ) -> FDErrorInfo | str:
         assert num_tries > 0
         iterations = 0
         planner_output = None
         for i in range(num_tries):
             planner_output = self._generate_plan(domain_file, problem_file)
             self.vars.generate_plan_calls += 1
-            if isinstance(planner_output, Path):
+            if isinstance(planner_output, str):
                 break
             elif type(planner_output) is FDErrorInfo and planner_output.exit_code in [
                 ExitCodes.TRANSLATE_CRITICAL_ERROR,

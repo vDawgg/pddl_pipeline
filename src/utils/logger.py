@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 
 def configure_logging(console_level: int = logging.INFO) -> None:
@@ -18,7 +17,7 @@ def configure_logging(console_level: int = logging.INFO) -> None:
     main_logger.addHandler(console_handler)
 
 
-def add_file_handler(log_file: Path, level: int = logging.DEBUG) -> logging.FileHandler:
+def add_file_handler(log_file: str, level: int = logging.DEBUG) -> logging.FileHandler:
     file_handler = logging.FileHandler(log_file, mode="w")
     file_handler.setLevel(level)
     file_handler.setFormatter(

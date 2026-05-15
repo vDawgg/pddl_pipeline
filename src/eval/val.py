@@ -1,7 +1,6 @@
 import logging
 import re
 from dataclasses import dataclass
-from pathlib import Path
 from subprocess import PIPE, run
 
 logger = logging.getLogger(__name__)
@@ -85,7 +84,7 @@ def make_error_info(parser_output: str, lines: list[str], problem: bool = False)
     return VALErrorInfo(num_errors, num_warnings, errors, warnings)
 
 
-def get_syntax_mistakes_domain(domain_file: Path) -> VALErrorInfo:
+def get_syntax_mistakes_domain(domain_file: str) -> VALErrorInfo:
     process = run(
         ["Parser", domain_file],
         stdout=PIPE,
@@ -96,7 +95,7 @@ def get_syntax_mistakes_domain(domain_file: Path) -> VALErrorInfo:
     return error_info
 
 
-def get_syntax_mistakes_problem(domain_file: Path, problem_file: Path) -> VALErrorInfo:
+def get_syntax_mistakes_problem(domain_file: str, problem_file: str) -> VALErrorInfo:
     process = run(
         ["Parser", domain_file, problem_file],
         stdout=PIPE,
@@ -107,7 +106,7 @@ def get_syntax_mistakes_problem(domain_file: Path, problem_file: Path) -> VALErr
     return error_info
 
 
-def is_domain_valid(domain_file: Path) -> bool:
+def is_domain_valid(domain_file: str) -> bool:
     err_info = get_syntax_mistakes_domain(domain_file)
     if err_info.num_errors > 0:
         logger.debug("Failed to create a syntactically valid domain")
@@ -117,8 +116,8 @@ def is_domain_valid(domain_file: Path) -> bool:
 
 
 def is_problem_valid(
-    domain_file: Path,
-    problem_file: Path,
+    domain_file: str,
+    problem_file: str,
 ) -> bool:
     err_info = get_syntax_mistakes_problem(domain_file, problem_file)
     if err_info.num_errors > 0:

@@ -17,7 +17,9 @@ class TestToolCallPipeline:
         )
 
     def test_read_pddl_file_full_content(self):
-        self.pipeline.vars.domain_file = pipeline_resource_dir / "sample_domain.pddl"
+        self.pipeline.vars.domain_file = (
+            pipeline_resource_dir / "sample_domain.pddl"
+        ).as_posix()
         file_with_line_numbers = (
             pipeline_resource_dir / "sample_domain_line_numbers.pddl"
         )
@@ -27,7 +29,9 @@ class TestToolCallPipeline:
             assert self.pipeline.vars.read_pddl_file_calls == 1
 
     def test_read_pddl_file_with_line_range(self):
-        self.pipeline.vars.domain_file = pipeline_resource_dir / "sample_domain.pddl"
+        self.pipeline.vars.domain_file = (
+            pipeline_resource_dir / "sample_domain.pddl"
+        ).as_posix()
         file_with_line_numbers = (
             pipeline_resource_dir / "sample_domain_line_numbers.pddl"
         )
@@ -37,7 +41,9 @@ class TestToolCallPipeline:
             assert self.pipeline.vars.read_pddl_file_calls == 1
 
     def test_read_pddl_file_single_line(self):
-        self.pipeline.vars.domain_file = pipeline_resource_dir / "sample_domain.pddl"
+        self.pipeline.vars.domain_file = (
+            pipeline_resource_dir / "sample_domain.pddl"
+        ).as_posix()
         file_with_line_numbers = (
             pipeline_resource_dir / "sample_domain_line_numbers.pddl"
         )
@@ -47,7 +53,9 @@ class TestToolCallPipeline:
             assert self.pipeline.vars.read_pddl_file_calls == 1
 
     def test_read_pddl_file_increments_call_counter(self):
-        self.pipeline.vars.domain_file = pipeline_resource_dir / "sample_domain.pddl"
+        self.pipeline.vars.domain_file = (
+            pipeline_resource_dir / "sample_domain.pddl"
+        ).as_posix()
         self.pipeline.read_pddl_file(PDDLFiles.DOMAIN)
         assert self.pipeline.vars.read_pddl_file_calls == 1
         self.pipeline.read_pddl_file(PDDLFiles.DOMAIN)
@@ -60,7 +68,9 @@ class TestToolCallPipeline:
     def test_edit_lines_single_line_replacement(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             src_file = pipeline_resource_dir / "sample_domain.pddl"
-            self.pipeline.vars.domain_file = Path(tmp_dir) / "test_domain.pddl"
+            self.pipeline.vars.domain_file = (
+                Path(tmp_dir) / "test_domain.pddl"
+            ).as_posix()
             shutil.copy(src_file, self.pipeline.vars.domain_file)
             self.pipeline.edit_lines(
                 PDDLFiles.DOMAIN,
@@ -78,7 +88,9 @@ class TestToolCallPipeline:
     def test_edit_lines_shrink_content(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             src_file = pipeline_resource_dir / "sample_domain.pddl"
-            self.pipeline.vars.domain_file = Path(tmp_dir) / "test_domain.pddl"
+            self.pipeline.vars.domain_file = (
+                Path(tmp_dir) / "test_domain.pddl"
+            ).as_posix()
             shutil.copy(src_file, self.pipeline.vars.domain_file)
             new_predicates = (
                 """(:predicates\n(on ?b1 ?b2)\n(clear ?b)\n(arm-empty)\n)"""
@@ -97,7 +109,9 @@ class TestToolCallPipeline:
     def test_edit_lines_expand_content(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             src_file = pipeline_resource_dir / "sample_domain.pddl"
-            self.pipeline.vars.domain_file = Path(tmp_dir) / "test_domain.pddl"
+            self.pipeline.vars.domain_file = (
+                Path(tmp_dir) / "test_domain.pddl"
+            ).as_posix()
             shutil.copy(src_file, self.pipeline.vars.domain_file)
             expanded_content = """(:types\nblock\nrobot\ntable\n)"""
             self.pipeline.edit_lines(
@@ -114,7 +128,9 @@ class TestToolCallPipeline:
     def test_edit_lines_first_line(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             src_file = pipeline_resource_dir / "sample_domain.pddl"
-            self.pipeline.vars.domain_file = Path(tmp_dir) / "test_domain.pddl"
+            self.pipeline.vars.domain_file = (
+                Path(tmp_dir) / "test_domain.pddl"
+            ).as_posix()
             shutil.copy(src_file, self.pipeline.vars.domain_file)
             self.pipeline.edit_lines(
                 PDDLFiles.DOMAIN,
@@ -130,7 +146,9 @@ class TestToolCallPipeline:
     def test_edit_lines_introduce_error_domain(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             src_file = pipeline_resource_dir / "sample_domain.pddl"
-            self.pipeline.vars.domain_file = Path(tmp_dir) / "test_domain.pddl"
+            self.pipeline.vars.domain_file = (
+                Path(tmp_dir) / "test_domain.pddl"
+            ).as_posix()
             shutil.copy(src_file, self.pipeline.vars.domain_file)
             edit_out = self.pipeline.edit_lines(
                 PDDLFiles.DOMAIN,
@@ -146,7 +164,9 @@ class TestToolCallPipeline:
     def test_edit_lines_introduce_error_problem(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             src_file = pipeline_resource_dir / "sample_problem.pddl"
-            self.pipeline.vars.domain_file = Path(tmp_dir) / "test_problem.pddl"
+            self.pipeline.vars.domain_file = (
+                Path(tmp_dir) / "test_problem.pddl"
+            ).as_posix()
             shutil.copy(src_file, self.pipeline.vars.domain_file)
             edit_out = self.pipeline.edit_lines(
                 PDDLFiles.DOMAIN,
@@ -162,7 +182,9 @@ class TestToolCallPipeline:
     def test_edit_lines_increments_call_counter(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             src_file = pipeline_resource_dir / "sample_domain.pddl"
-            self.pipeline.vars.domain_file = Path(tmp_dir) / "test_domain.pddl"
+            self.pipeline.vars.domain_file = (
+                Path(tmp_dir) / "test_domain.pddl"
+            ).as_posix()
             shutil.copy(src_file, self.pipeline.vars.domain_file)
             self.pipeline.edit_lines(PDDLFiles.DOMAIN, line_range=(0, 0), new="")
             assert self.pipeline.vars.edit_lines_calls == 1

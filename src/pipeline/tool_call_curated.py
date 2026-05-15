@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import dspy
 
 from src.base.schemas import Domains, Pipelines, Problems, Tools
@@ -26,8 +24,8 @@ class DSPyToolCallPipelineCurated(ToolCallPipeline):
         elif self.vars.problem_file is None:
             return "Problem file has not yet been created"
         plan_output = self._generate_plan(
-            Path(self.vars.domain_file),
-            Path(self.vars.problem_file),
+            self.vars.domain_file,
+            self.vars.problem_file,
             UnsolvabilityFeedback.CURATED,
         )
         if isinstance(plan_output, FDErrorInfo):

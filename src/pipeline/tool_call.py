@@ -1,6 +1,5 @@
 import logging
 import shutil
-from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Literal
 
@@ -114,7 +113,7 @@ class ToolCallPipeline(PipelineBase):
         if optimized_program is not None:
             self.load(optimized_program)
 
-    def map_plan(self, plan_file: Path) -> str:
+    def map_plan(self, plan_file: str) -> str:
         # Map plan to action schema of robot
         base_action_mapping_prompt = get_prompt(Prompts.ACTION_MAPPING)
         with open(plan_file) as f:
@@ -154,7 +153,7 @@ class ToolCallPipeline(PipelineBase):
                 self.vars.domain_file = file_path
             elif pddl_file_type == PDDLFiles.PROBLEM:
                 self.vars.problem_file = file_path
-            return file_path._str
+            return file_path
         # Already created a file. Preferring to use same file name to avoid model confusing
         # different versions of domain/problem file.
         file_path = (
@@ -228,16 +227,14 @@ class ToolCallPipeline(PipelineBase):
             file_contents[start : end + 1] = [r + "\n" for r in new.split("\n")]
             f.write("".join(file_contents))
         if "domain" in str(file):
-            err_info = _get_syntax_mistakes_domain(Path(temp_file.name))
+            err_info = _get_syntax_mistakes_domain(temp_file.name)
             if err_info.num_errors > 0:
                 return (
                     "Your edit was not applied to the file, as it would have introduced the following new syntax errors:\n"
                     + err_info.get_lines_with_errors()
                 )
         else:
-            err_info = _get_syntax_mistakes_problem(
-                Path(self.domain), Path(temp_file.name)
-            )
+            err_info = _get_syntax_mistakes_problem(self.domain, temp_file.name)
             if err_info.num_errors > 0:
                 return (
                     "Your edit was not applied to the file, as it would have introduced the following new syntax errors:\n"
@@ -258,7 +255,7 @@ class ToolCallPipeline(PipelineBase):
         self.vars.domain_syntax_errors_calls += 1
         if self.vars.domain_file is None:
             return "Domain file has not yet been created"
-        err_info = _get_syntax_mistakes_domain(Path(self.vars.domain_file))
+        err_info = _get_syntax_mistakes_domain(self.vars.domain_file)
         if err_info.num_errors > 0:
             return err_info.get_lines_with_errors()
         return "No syntax mistakes found in domain file."
@@ -277,7 +274,7 @@ class ToolCallPipeline(PipelineBase):
         elif self.vars.problem_file is None:
             return "Problem file has not yet been created"
         err_info = _get_syntax_mistakes_problem(
-            Path(self.vars.domain_file), Path(self.vars.problem_file)
+            self.vars.domain_file, self.vars.problem_file
         )
         if err_info.num_errors > 0:
             return err_info.get_lines_with_errors()
@@ -298,7 +295,7 @@ class ToolCallPipeline(PipelineBase):
         elif self.vars.problem_file is None:
             return "Problem file has not yet been created"
         translate_output = _translate_pddl(
-            Path(self.vars.domain_file), Path(self.vars.problem_file)
+            self.vars.domain_file, self.vars.problem_file
         )
         if translate_output is not None:
             return "Translation was unsuccessful\n" + translate_output.to_str()
@@ -318,9 +315,7 @@ class ToolCallPipeline(PipelineBase):
             return "Domain file has not yet been created"
         elif self.vars.problem_file is None:
             return "Problem file has not yet been created"
-        plan_output = self._generate_plan(
-            Path(self.vars.domain_file), Path(self.vars.problem_file)
-        )
+        plan_output = self._generate_plan(self.vars.domain_file, self.vars.problem_file)
         if isinstance(plan_output, FDErrorInfo):
             return (
                 "Fast Downward was unable to generate a plan\n" + plan_output.to_str()
