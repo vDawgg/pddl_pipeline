@@ -132,11 +132,11 @@ class AbstractionGenerator:
     Sreedharan, Sarath, et al. "Why Can't You Do That HAL? Explaining Unsolvability of Planning Tasks." IJCAI. 2019.
     """
 
-    def __init__(self, domain_file: Path, problem_file: Path):
+    def __init__(self, domain_file: str, problem_file: str):
         self.domain_file = domain_file
         self.problem_file = problem_file
-        self._domain_text = domain_file.read_text()
-        self._problem_text = problem_file.read_text()
+        self._domain_text = Path(domain_file).read_text()
+        self._problem_text = Path(problem_file).read_text()
         # Extract predicate signatures (name and parameters) from domain
         self.predicates: dict[str, tuple[str, int]] = (
             self._extract_predicates_from_domain()
@@ -213,12 +213,12 @@ class AbstractionGenerator:
             pddl_text = re.sub(pattern_direct, "", pddl_text)
         return pddl_text
 
-    def _write_temp_pddl(self, pddl_text: str) -> Path:
-        temp_file = NamedTemporaryFile(delete=False, mode="w")
+    def _write_temp_pddl(self, pddl_text: str) -> str:
+        temp_file = NamedTemporaryFile(delete=False, mode="w", suffix=".pddl")
         temp_file.write(pddl_text)
         temp_file.flush()
         temp_file.close()
-        return Path(temp_file.name)
+        return temp_file.name
 
 
 class UnsolvabilityParser:
@@ -428,7 +428,7 @@ translate_parser = TranslateParser()
 unsolvability_parser = UnsolvabilityParser()
 
 
-def generate_plan(domain_file: Path, problem_file: Path) -> tuple[Path, ExitCodes, str]:
+def generate_plan(domain_file: str, problem_file: str) -> tuple[Path, ExitCodes, str]:
     plan_file = NamedTemporaryFile(delete=False)
     process = run(
         [
@@ -452,7 +452,7 @@ def generate_plan(domain_file: Path, problem_file: Path) -> tuple[Path, ExitCode
     return Path(plan_file.name), fd_code, process.stdout
 
 
-def translate_pddl(domain_file: Path, problem_file: Path) -> FDErrorInfo | None:
+def translate_pddl(domain_file: str, problem_file: str) -> FDErrorInfo | None:
     """
     Executes the translation part of FD only.
     This is intended as a separate feedback step before plan-generation to find
@@ -460,7 +460,7 @@ def translate_pddl(domain_file: Path, problem_file: Path) -> FDErrorInfo | None:
     After this succceeds without issues, teh only issue that can still occur is
     the domain being unsolvable.
     """
-    assert domain_file.exists() and problem_file.exists(), (
+    assert Path(domain_file).exists() and Path(problem_file).exists(), (
         "Given domain or problem file does not exist"
     )
     sas_file = NamedTemporaryFile(delete=False)
@@ -485,8 +485,8 @@ def translate_pddl(domain_file: Path, problem_file: Path) -> FDErrorInfo | None:
 def parse_error(
     planner_output: str,
     fd_code: ExitCodes,
-    domain_file: Path,
-    problem_file: Path,
+    domain_file: str,
+    problem_file: str,
     unsolvability_feedback: UnsolvabilityFeedback = UnsolvabilityFeedback.SIMPLE,
 ) -> FDErrorInfo:
     if is_translate_error(fd_code):

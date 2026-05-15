@@ -22,8 +22,8 @@ class TestFastDownward:
     def test_translate_error_expected(self):
         test_resources = eval_resource_dir / "test_translate_error_expected"
         error_info = self.pipeline._generate_plan(
-            test_resources / "domain.pddl",
-            test_resources / "problem.pddl",
+            (test_resources / "domain.pddl").as_posix(),
+            (test_resources / "problem.pddl").as_posix(),
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
@@ -35,8 +35,8 @@ class TestFastDownward:
             eval_resource_dir / "test_translate_error_incorrect_domain_start"
         )
         error_info = self.pipeline._generate_plan(
-            test_resources / "domain.pddl",
-            test_resources / "problem.pddl",
+            (test_resources / "domain.pddl").as_posix(),
+            (test_resources / "problem.pddl").as_posix(),
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
@@ -47,8 +47,8 @@ class TestFastDownward:
     def test_duplicate_objects(self):
         test_resources = eval_resource_dir / "test_duplicate_objects"
         error_info = self.pipeline._generate_plan(
-            test_resources / "domain.pddl",
-            test_resources / "problem.pddl",
+            (test_resources / "domain.pddl").as_posix(),
+            (test_resources / "problem.pddl").as_posix(),
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.TRANSLATE_INPUT_ERROR
@@ -59,8 +59,8 @@ class TestFastDownward:
     def test_search_unsolved_curated(self):
         test_resources = eval_resource_dir / "test_search_unsolved_curated"
         error_info = self.pipeline._generate_plan(
-            test_resources / "domain.pddl",
-            test_resources / "problem.pddl",
+            (test_resources / "domain.pddl").as_posix(),
+            (test_resources / "problem.pddl").as_posix(),
             UnsolvabilityFeedback.CURATED,
         )
         assert type(error_info) is FDErrorInfo
@@ -71,8 +71,8 @@ class TestFastDownward:
     def test_search_unsolved_full(self):
         test_resources = eval_resource_dir / "test_search_unsolved_full"
         error_info = self.pipeline._generate_plan(
-            test_resources / "domain.pddl",
-            test_resources / "problem.pddl",
+            (test_resources / "domain.pddl").as_posix(),
+            (test_resources / "problem.pddl").as_posix(),
             UnsolvabilityFeedback.FULL,
         )
         assert type(error_info) is FDErrorInfo
@@ -88,8 +88,8 @@ class TestFastDownward:
     def test_search_unsolved_simple(self):
         test_resources = eval_resource_dir / "test_search_unsolved_simple"
         error_info = self.pipeline._generate_plan(
-            test_resources / "domain.pddl",
-            test_resources / "problem.pddl",
+            (test_resources / "domain.pddl").as_posix(),
+            (test_resources / "problem.pddl").as_posix(),
         )
         assert type(error_info) is FDErrorInfo
         assert error_info.exit_code == ExitCodes.SEARCH_UNSOLVED_INCOMPLETE
@@ -99,8 +99,8 @@ class TestFastDownward:
     def test_abstraction_generation(self):
         test_resources = eval_resource_dir / "test_abstraction_generation"
         error_info = self.pipeline._generate_plan(
-            test_resources / "domain.pddl",
-            test_resources / "problem.pddl",
+            (test_resources / "domain.pddl").as_posix(),
+            (test_resources / "problem.pddl").as_posix(),
             UnsolvabilityFeedback.ABSTRACTION,
         )
         assert type(error_info) is FDErrorInfo

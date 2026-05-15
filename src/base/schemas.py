@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import StrEnum, auto
-from pathlib import Path
 
 
 class PDDLFiles(StrEnum):
@@ -24,10 +23,10 @@ class PipelineResult:
     elapsed_time: float = 0.0
     num_model_calls: int = 0
     error: PipelineError | None = None
-    domain_file: Path | None = None
-    problem_file: Path | None = None
-    plan_file: Path | None = None
-    log_file: Path | None = None
+    domain_file: str | None = None
+    problem_file: str | None = None
+    plan_file: str | None = None
+    log_file: str | None = None
     ablate_tools: str | None = None
     input_tokens: int = 0
     output_tokens: int = 0
