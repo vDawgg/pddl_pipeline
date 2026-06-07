@@ -3,7 +3,13 @@ from typing import Literal
 
 import dspy
 
-from src.base.mappings import ACTION_SCHEMA_PROMPTS, DOMAIN_PROMPTS, IMAGES, OBJECT_NAME_PROMPTS, PROBLEM_PROMPTS
+from src.base.mappings import (
+    ACTION_SCHEMA_PROMPTS,
+    DOMAIN_PROMPTS,
+    IMAGES,
+    OBJECT_NAME_PROMPTS,
+    PROBLEM_PROMPTS,
+)
 from src.base.pipeline import FDErrorInfo
 from src.base.schemas import (
     Domains,
@@ -16,7 +22,7 @@ from src.base.schemas import (
 from src.constants import images_dir
 from src.eval.val import is_domain_valid, is_problem_valid
 from src.inference import Models
-from src.pipeline.tool_call_curated import DSPyToolCallPipelineCurated
+from src.pipeline.tool_call_curated import ToolCallPipelineCurated
 from src.utils.prompts import Prompts, get_domain_problem_prompt, get_prompt
 
 logger = logging.getLogger(__name__)
@@ -62,7 +68,7 @@ class ActionMappingSignature(dspy.Signature):
     )
 
 
-class ToolCallImagePipeline(DSPyToolCallPipelineCurated):
+class ToolCallImagePipeline(ToolCallPipelineCurated):
     def __init__(
         self,
         model: Models,

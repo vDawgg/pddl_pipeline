@@ -47,7 +47,6 @@ class Pipelines(StrEnum):
     TOOL_CALL_FULL = auto()
     TOOL_CALL_IMAGE = auto()
     RIGID_TRAJECTORY = auto()
-    RIGID_TRAJECTORY_IMAGE = auto()
 
 
 class Tools(StrEnum):

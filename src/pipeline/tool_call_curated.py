@@ -6,7 +6,7 @@ from src.inference import Models
 from src.pipeline.tool_call import GeneratePddlSignature, ToolCallPipeline
 
 
-class DSPyToolCallPipelineCurated(ToolCallPipeline):
+class ToolCallPipelineCurated(ToolCallPipeline):
     """Version of dspy tool call pipeline with curated unsolvabiliity feedback"""
 
     def generate_plan(self) -> str:

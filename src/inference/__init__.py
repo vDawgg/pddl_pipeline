@@ -36,64 +36,22 @@ class ModelConfig:
 
 
 class Models(StrEnum):
-    QWEN_3_VL_8B = auto()
-    QWEN_3_VL_235B = auto()
-    QWEN_3_14B = auto()
-    QWEN_3_32B = auto()
     QWEN_35_4B = auto()
     QWEN_35_122B = auto()
-    QWEN_25_CODER_14B = auto()
     GEMMA_3_12B = auto()
-    GEMMA_3_27B = auto()
     GEMMA_4_E4B = auto()
     GEMMA_4_31B = auto()
     GEMINI_3_FLASH = auto()
-    QWEN_3_CODER = auto()
-    QWEN_3_CODER_NEXT = auto()
-    GPT_OSS = auto()
     GPT_OSS_20B = auto()
     GPT_OSS_120B = auto()
     GPT_52 = auto()
     GPT_52_CODEX = auto()
-    GPT_5_NANO = auto()
     MINIMAX_M25 = auto()
     OPUS_45 = auto()
     OPUS_46 = auto()
 
 
 MODEL_CONFIGS: dict[Models, ModelConfig] = {
-    Models.QWEN_3_VL_8B: ModelConfig(
-        api_model_name="qwen-3-vl",
-        provider=Provider.LOCAL,
-    ),
-    Models.QWEN_3_VL_235B: ModelConfig(
-        api_model_name="qwen/qwen3-vl-235b-a22b-instruct",
-        provider=Provider.OPENROUTER,
-    ),
-    Models.QWEN_3_14B: ModelConfig(
-        api_model_name="qwen-3",
-        provider=Provider.LOCAL,
-    ),
-    Models.QWEN_3_32B: ModelConfig(
-        api_model_name="qwen/qwen3-32b:nitro",
-        provider=Provider.OPENROUTER,
-    ),
-    Models.QWEN_35_122B: ModelConfig(
-        api_model_name="qwen/qwen3.5-122b-a10b:nitro",
-        provider=Provider.OPENROUTER,
-    ),
-    Models.QWEN_25_CODER_14B: ModelConfig(
-        api_model_name="qwen-2.5-coder",
-        provider=Provider.LOCAL,
-    ),
-    Models.GEMMA_3_12B: ModelConfig(
-        api_model_name="gemma3",
-        provider=Provider.LOCAL,
-    ),
-    Models.GEMMA_3_27B: ModelConfig(
-        api_model_name="google/gemma-3-27b-it",
-        provider=Provider.OPENROUTER,
-    ),
     Models.GEMMA_4_E4B: ModelConfig(
         api_model_name="google/gemma-4",
         provider=Provider.LOCAL,
@@ -101,18 +59,6 @@ MODEL_CONFIGS: dict[Models, ModelConfig] = {
     Models.GEMMA_4_31B: ModelConfig(
         api_model_name="google/gemma-4",
         provider=Provider.LOCAL,
-    ),
-    Models.GEMINI_3_FLASH: ModelConfig(
-        api_model_name="google/gemini-3-flash-preview",
-        provider=Provider.OPENROUTER,
-    ),
-    Models.QWEN_3_CODER: ModelConfig(
-        api_model_name="qwen/qwen3-coder",
-        provider=Provider.OPENROUTER,
-    ),
-    Models.QWEN_3_CODER_NEXT: ModelConfig(
-        api_model_name="qwen/qwen3-coder-next",
-        provider=Provider.OPENROUTER,
     ),
     Models.QWEN_35_4B: ModelConfig(
         api_model_name="qwen/qwen3.5-4b",
@@ -130,16 +76,16 @@ MODEL_CONFIGS: dict[Models, ModelConfig] = {
         api_model_name="openai/gpt-oss-120b:nitro",
         provider=Provider.LOCAL,
     ),
+    Models.GEMINI_3_FLASH: ModelConfig(
+        api_model_name="google/gemini-3-flash-preview",
+        provider=Provider.OPENROUTER,
+    ),
     Models.GPT_52: ModelConfig(
         api_model_name="gpt-5.2",
         provider=Provider.OPENAI,
     ),
     Models.GPT_52_CODEX: ModelConfig(
         api_model_name="gpt-5.2-codex",
-        provider=Provider.OPENAI,
-    ),
-    Models.GPT_5_NANO: ModelConfig(
-        api_model_name="gpt-5-nano",
         provider=Provider.OPENAI,
     ),
     Models.MINIMAX_M25: ModelConfig(

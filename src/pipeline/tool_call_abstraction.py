@@ -6,7 +6,7 @@ from src.inference import Models
 from src.pipeline.tool_call import GeneratePddlSignature, ToolCallPipeline
 
 
-class DSPyToolCallPipelineAbstraction(ToolCallPipeline):
+class ToolCallPipelineAbstraction(ToolCallPipeline):
     """
     Version of dspy tool call pipeline with unsolvabiliity feedback.
     The feedback includes information on which predicates could get removed from the domain which would lead to
