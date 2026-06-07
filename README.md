@@ -6,9 +6,9 @@ Code repository for master thesis 'Automated PDDL Generation Using Large Languag
 
 While the dependencies noted below are part of the docker image, the following outlines the local development setup if needed.
 
-For the syntax checks courtesy of [VAL](https://github.com/vDawgg/VAL) make sure to install the ```Parser``` binary to your system together with the corresponding ```libval.so``` library.
+For the syntax checks courtesy of [VAL](https://github.com/vDawgg/VAL) make sure to install the ```Parser``` binary to your system together with the corresponding ```libval.so``` library. Note, that we use a forked version of VAL, where a memory leak in the parser logic that lead to frequent pipeline crashes has been fixed.
 
-Additionally, for the FastDownward planning system build version ```24.06.1```, which you can find [here](https://www.fast-downward.org/latest/releases/24.06/), place its source directoy one level outside of this directory and build the release by running ```build.py release```, so it can be referenced in our code by ```../../fast-downward-24.06.1/fast-downward.py```.
+Additionally, the source directory of the FastDownward planning system build version ```24.06.1```, which you can find [here](https://www.fast-downward.org/latest/releases/24.06/), needs to be placed one level outside of this directory and built by running ```build.py release```, so it can be referenced in our code via ```../../fast-downward-24.06.1/fast-downward.py```.
 
 ## Running the project
 
@@ -16,7 +16,7 @@ Additionally, for the FastDownward planning system build version ```24.06.1```, 
 
 Before running the project locally, you either have to add a api-key, which has to be copied to ```.openrouter-key``` or ```.openai-key``` depending on the model you want to use, or first start one of the models for local inference as outlined below.
 
-The two main entrypoints to run the project are [main.py](main.py) and [eval.py](eval.py). While main is intended for testing and debugging purposes, eval shows the eval output after a specific number of iterations and does not log debug information to stdout. For both, one of the pipelines defined in [pipeline](./src/pipeline/) has to be specified before starting. The remaining options can be shown via ```uv run main.py --help```
+The main entrypoint to run the project is [eval.py](eval.py). This script is intended to run for a specified number of iterations, where all results are saved/logs to their respective directories. The options that can be specified to run this script can be seen when running ```uv run eval.py --help```
 
 #### Example Run
 
@@ -30,14 +30,20 @@ The results for each run are then written as a csv-file to the [results](./resul
 
 ### Docker
 
-For inference on local hardware, we provide a set of [llama-cpp-server]() configurations which can be run using docker-compose. To start up the server running e.g. gemma-4-4b, run ```docker compose --profile gemma-4 up -d``` and wait until the service is healthy.
+For inference on local hardware, we provide a set of [llama-cpp-server]() configurations which can be run using docker-compose. To start up the server running e.g. gemma-4-e4b, run ```docker compose --profile gemma_4_e4b up -d``` and wait until the service is healthy.
 
 The pipeline can then be started by runninng the command below. Note that the container always runs the eval script for the pipeline and accepts the same arguments as the script when its run locally.
 
 ```bash
-docker compose run --build --rm pipeline --model gemma_4 --domain ring_and_peg --problem ring_and_peg_1 --pipeline tool_call --iterations 30
+docker compose run --build --rm pipeline --model gemma_4_e4b --domain ring_and_peg --problem ring_and_peg_1 --pipeline tool_call --iterations 30
 ```
 
 Running the pipeline also automatically mounts the results, plans, logs and pddl directories so the artifacts from each run can be referenced later.
 
 **Note:** We assume that the [nvidia container toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) is set up on your system, to make GPU inference work.
+
+# Results
+
+We uploaded the results we report in the thesis together with the generated plans [here](https://tubcloud.tu-berlin.de/s/o9XAqb4xjaBBP42).
+
+The optimized prompts of the GEPA optimization reported in the thesis are saved in [this](./optimized_tool_call_curated_gpt_oss_20b.json) json file and can be used when running the pipeline when specified via the ```--optimized_program``` flag.

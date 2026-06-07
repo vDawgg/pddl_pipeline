@@ -1,5 +1,4 @@
 import logging
-import os
 from argparse import ArgumentParser
 
 from src.base.pipeline import Tools
@@ -8,40 +7,28 @@ from src.inference import Models
 from src.pipeline import Pipelines, pipelines
 from src.utils.logger import configure_logging
 
-# TODO: For ease of use this should probably just be merged with main.py
 if __name__ == "__main__":
-    env_iterations = os.environ.get("EVAL_ITERATIONS", 1)
-    env_pipeline = os.environ.get("EVAL_PIPELINE", Pipelines.RIGID_TRAJECTORY.value)
-    env_model = os.environ.get("EVAL_MODEL", Models.QWEN_3_VL_8B.value)
-    env_domain = os.environ.get("EVAL_DOMAIN", Domains.RING_AND_PEG.value)
-
     parser = ArgumentParser()
-    parser.add_argument(
-        "--iterations", default=env_iterations, type=int, required=False
-    )
+    parser.add_argument("--iterations", type=int, required=True)
     parser.add_argument(
         "--pipeline",
         choices=[pipeline.value for pipeline in Pipelines],
-        default=env_pipeline,
-        required=False,
+        required=True,
     )
     parser.add_argument(
         "--model",
         choices=[model.value for model in Models],
-        default=env_model,
-        required=False,
+        required=True,
     )
     parser.add_argument(
         "--domain",
         choices=[domain.value for domain in Domains],
-        default=env_domain,
-        required=False,
+        required=True,
     )
     parser.add_argument(
         "--problem",
         choices=[problem.value for problem in Problems],
-        default=Problems.RING_AND_PEG_1,
-        required=False,
+        required=True,
     )
     parser.add_argument(
         "--ablate_tools",
@@ -62,9 +49,16 @@ if __name__ == "__main__":
     model = args.model
     domain = args.domain
     problem = args.problem
-    ablate_tools = args.ablate_tools
-    if ablate_tools is not None:
-        ablate_tools = str(ablate_tools).split(",")
+    ablate_tools_args = args.ablate_tools
+    ablate_tools = []
+    if ablate_tools_args is not None:
+        for tool in str(ablate_tools_args).split(","):
+            try:
+                ablate_tools.append(Tools(tool))
+            except Exception:
+                raise ValueError(
+                    f"Specified tool '{tool}' for ablation does not match any known tool."
+                ) from None
     optimize = args.optimize
     optimized_program = args.optimized_program
 

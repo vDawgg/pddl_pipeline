@@ -31,7 +31,6 @@ FROM app_base
 
 COPY ./src ./src
 COPY ./prompts ./prompts
-COPY ./main.py ./main.py
 COPY ./eval.py ./eval.py
 COPY ./.default-key ./.default-key
 

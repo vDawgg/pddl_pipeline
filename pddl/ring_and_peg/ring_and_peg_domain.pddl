@@ -1,42 +1,47 @@
 (define (domain RING_AND_PEG)
-    (:requirements :strips :typing :negative-preconditions :conditional-effects)
-    (:types ring peg)
+    (:requirements :strips)
     (:predicates
-        (at ?x - peg)
-        (onpeg ?x - ring ?y - peg)
-        (pegempty ?x - peg)
-        (handempty)
-        (holding ?x - ring)
+        (at ?x)
+        (onpeg ?x ?y) (pegempty ?x)
+        (handempty) (holding ?x)
+        (peg ?x) (ring ?x)
     )
 
     (:action move
-        :parameters (?to - peg)
-        :precondition (and (not (at ?to)))
-        :effect (and
-            (forall (?p - peg) (not (at ?p)))
-            (at ?to)
+        :parameters (?from ?to)
+        :precondition (and
+            (at ?from)
+            (peg ?from) (peg ?to)
         )
+        :effect (and (not (at ?from)) (at ?to))
     )
 
     (:action pick
-        :parameters (?x - ring ?y - peg)
-        :precondition (and (at ?y) (onpeg ?x ?y) (handempty))
+        :parameters (?x ?y)
+        :precondition (and
+            (at ?y)
+            (onpeg ?x ?y)
+            (handempty)
+            (peg ?y) (ring ?x)
+        )
         :effect(and
-            (not (onpeg ?x ?y))
-            (not (handempty))
-            (holding ?x)
-            (pegempty ?y)
+            (not (onpeg ?x ?y)) (pegempty ?y)
+            (not (handempty)) (holding ?x)
         )
     )
 
     (:action place
-        :parameters (?x - ring ?y - peg)
-        :precondition (and (at ?y) (holding ?x) (pegempty ?y))
+        :parameters (?x ?y)
+        :precondition (and
+            (at ?y)
+            (holding ?x)
+            (pegempty ?y)
+            (peg ?y)
+            (ring ?x)
+        )
         :effect (and
-            (not (holding ?x))
-            (handempty)
-            (onpeg ?x ?y)
-            (not (pegempty ?y))
+            (not (holding ?x)) (handempty)
+            (onpeg ?x ?y) (not (pegempty ?y))
         )
     )
 )
