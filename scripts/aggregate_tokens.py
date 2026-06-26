@@ -18,7 +18,7 @@ def extract_problem_name(problem_path):
     return name
 
 
-analyzed_dir = results_dir / "analyzed"
+analyzed_dir = results_dir
 relevant_dirs = {
     "gpt_oss_20b_optimized",
     "gpt_oss_120b",
@@ -142,11 +142,11 @@ image = ax.imshow(masked_values, aspect="auto", cmap="Reds")
 x_tick_labels = ["small-ow", "small-ow GEPA", "large-ow", "frontier", "frontier image"]
 
 ax.set_xticks(range(len(ordered_cols[1:])))
-ax.set_xticklabels(x_tick_labels, rotation=20, ha="right")
+ax.set_xticklabels(x_tick_labels, rotation=20, ha="right", fontsize=12)
 ax.set_yticks(range(len(pivot_table)))
-ax.set_yticklabels([str(problem) for problem in pivot_table["problem"]])
-ax.set_xlabel("Model")
-ax.set_ylabel("Problem")
+ax.set_yticklabels([str(problem) for problem in pivot_table["problem"]], fontsize=12)
+ax.set_xlabel("Model", fontsize=12)
+ax.set_ylabel("Problem", fontsize=12)
 
 non_nan_values = heatmap_values[~np.isnan(heatmap_values)]
 threshold = np.median(non_nan_values) if non_nan_values.size else 0
@@ -166,12 +166,14 @@ for row_idx in range(heatmap_values.shape[0]):
             ha="center",
             va="center",
             color=text_color,
-            fontsize=8,
+            fontsize=12,
         )
 
-fig.colorbar(image, ax=ax, label="Average output tokens")
+cbar = fig.colorbar(image, ax=ax)
+cbar.set_label("Average number of output tokens", fontsize=12)
+cbar.ax.tick_params(labelsize=12)
 fig.tight_layout()
-heatmap_path = charts_dir / "average_output_tokens_heatmap.pdf"
+heatmap_path = charts_dir / "average_output_tokens_heatmap.png"
 fig.savefig(heatmap_path, bbox_inches="tight")
 plt.close(fig)
 print(f"Saved heatmap to {heatmap_path}")

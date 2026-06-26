@@ -30,6 +30,7 @@ def make_stacked_results_chart(
     chart_name: str,
     chart_width: int = 12,
     boundaries: list[int] | None = None,
+    y_limit: int | None = None,
 ):
     palette = plt.get_cmap("viridis")(np.linspace(0.1, 0.9, 5))
     no_stage = []
@@ -85,10 +86,12 @@ def make_stacked_results_chart(
     )
 
     ax.set_xticks(x)
-    ax.set_xticklabels(x_labels, rotation=20, ha="right")
-    ax.set_ylim(0, 31)
+    ax.set_xticklabels(x_labels, rotation=20, ha="right", fontsize=12)
+    if y_limit is None:
+        y_limit = 31
+    ax.set_ylim(0, y_limit)
     ax.set_xlim(-0.5, len(x_labels) + 1.5)
-    ax.set_ylabel("Pipeline Runs")
+    ax.set_ylabel("Pipeline Runs", fontsize=12)
     ax.set_axisbelow(True)
     ax.yaxis.grid(True, which="major", linestyle="-", linewidth=0.6, alpha=0.25)
     if boundaries is not None:
@@ -99,12 +102,15 @@ def make_stacked_results_chart(
 
     ax.legend(
         loc="upper right",
-        bbox_to_anchor=(0.99 + legend_offset, 0.975),
+        bbox_to_anchor=(0.999, 0.999),
         borderaxespad=0.0,
+        fontsize=12,
     )
 
     plt.tight_layout()
     plt.savefig(charts_dir / chart_name, bbox_inches="tight")
+    if chart_name.endswith(".png"):
+        plt.savefig(charts_dir / chart_name.replace(".png", ".pdf"), bbox_inches="tight")
 
 
 if __name__ == "__main__":
@@ -159,7 +165,7 @@ if __name__ == "__main__":
         "Qwen 3.5 122B A10B",
         "Qwen 3.5 4B",
     ]
-    make_stacked_results_chart(dfs, x_labels, "os_bars.pdf", 8, boundaries=[2, 4])
+    make_stacked_results_chart(dfs, x_labels, "os_bars.png", 8, boundaries=[2, 4])
     print("gpt oss 120b applicable:", add_result_cols(gpt_oss_120B)[-1])
     print("gpt oss 20b solvable:", add_result_cols(gpt_oss_20B)[-2])
     print("gemma 4 31b applicable:", add_result_cols(gemma_4_31B)[-1])
@@ -199,7 +205,7 @@ if __name__ == "__main__":
         "ring_and_peg_4",
         "ring_and_peg_5",
     ]
-    make_stacked_results_chart(dfs, x_labels, "gpt_oss_120b_ring_and_peg.pdf")
+    make_stacked_results_chart(dfs, x_labels, "gpt_oss_120b_ring_and_peg.png")
 
     ring_and_peg_1_20 = pl.read_csv(
         gpt_oss_20_dir
@@ -228,7 +234,7 @@ if __name__ == "__main__":
         ring_and_peg_4_20,
         ring_and_peg_5_20,
     ]
-    make_stacked_results_chart(dfs, x_labels, "gpt_oss_20b_ring_and_peg.pdf")
+    make_stacked_results_chart(dfs, x_labels, "gpt_oss_20b_ring_and_peg.png")
 
     ring_and_peg_1_20_optimized = pl.read_csv(
         gpt_oss_20_optimized_dir
@@ -257,7 +263,7 @@ if __name__ == "__main__":
         ring_and_peg_4_20_optimized,
         ring_and_peg_5_20_optimized,
     ]
-    make_stacked_results_chart(dfs, x_labels, "gpt_oss_20b_ring_and_peg_optimized.pdf")
+    make_stacked_results_chart(dfs, x_labels, "gpt_oss_20b_ring_and_peg_optimized.png")
 
     needle_transfer_1_120 = pl.read_csv(
         gpt_oss_120_dir
@@ -272,7 +278,7 @@ if __name__ == "__main__":
         needle_transfer_2_120,
     ]
     x_labels = ["needle_transfer_1", "needle_transfer_2"]
-    make_stacked_results_chart(dfs, x_labels, "gpt_oss_120b_needle_transfer.pdf")
+    make_stacked_results_chart(dfs, x_labels, "gpt_oss_120b_needle_transfer.png")
 
     needle_transfer_1_20 = pl.read_csv(
         gpt_oss_20_dir
@@ -283,7 +289,7 @@ if __name__ == "__main__":
         / "needle_transfer_needle_transfer_2_tool_call_curated_gpt_oss_20b_base_2026-04-24-06:22:09_cc8165bfb2534cd28edcef9955114523.csv"
     )
     dfs = [needle_transfer_1_20, needle_transfer_2_20]
-    make_stacked_results_chart(dfs, x_labels, "gpt_oss_20b_needle_transfer.pdf")
+    make_stacked_results_chart(dfs, x_labels, "gpt_oss_20b_needle_transfer.png")
 
     needle_transfer_1_20_optimized = pl.read_csv(
         gpt_oss_20_optimized_dir
@@ -295,7 +301,7 @@ if __name__ == "__main__":
     )
     dfs = [needle_transfer_1_20_optimized, needle_transfer_2_20_optimized]
     make_stacked_results_chart(
-        dfs, x_labels, "gpt_oss_20b_needle_transfer_optimized.pdf"
+        dfs, x_labels, "gpt_oss_20b_needle_transfer_optimized.png"
     )
 
     needle_sorting_1_120 = pl.read_csv(
@@ -312,7 +318,7 @@ if __name__ == "__main__":
     )
     dfs = [needle_sorting_1_120, needle_sorting_2_120, needle_sorting_3_120]
     x_labels = ["needle_sorting_1", "needle_sorting_2", "needle_sorting_3"]
-    make_stacked_results_chart(dfs, x_labels, "gpt_oss_120b_needle_sorting.pdf")
+    make_stacked_results_chart(dfs, x_labels, "gpt_oss_120b_needle_sorting.png")
 
     needle_sorting_1_20 = pl.read_csv(
         gpt_oss_20_dir
@@ -327,7 +333,7 @@ if __name__ == "__main__":
         / "needle_sorting_needle_sorting_3_tool_call_curated_gpt_oss_20b_base_2026-04-24-16:02:20_3d94e977200c4c60ae3d202b14368cfc.csv"
     )
     dfs = [needle_sorting_1_20, needle_sorting_2_20, needle_sorting_3_20]
-    make_stacked_results_chart(dfs, x_labels, "gpt_oss_20b_needle_sorting.pdf")
+    make_stacked_results_chart(dfs, x_labels, "gpt_oss_20b_needle_sorting.png")
 
     needle_sorting_1_20_optimized = pl.read_csv(
         gpt_oss_20_optimized_dir
@@ -347,7 +353,7 @@ if __name__ == "__main__":
         needle_sorting_3_20_optimized,
     ]
     make_stacked_results_chart(
-        dfs, x_labels, "gpt_oss_20b_needle_sorting_optimized.pdf"
+        dfs, x_labels, "gpt_oss_20b_needle_sorting_optimized.png"
     )
 
     combined_all_120_dfs = [
@@ -377,7 +383,7 @@ if __name__ == "__main__":
     make_stacked_results_chart(
         combined_all_120_dfs,
         combined_all_120_labels,
-        "gpt_oss_120b_all_problems.pdf",
+        "gpt_oss_120b_all_problems.png",
         boundaries=[5, 7],
     )
     sum = 0
@@ -412,7 +418,7 @@ if __name__ == "__main__":
     make_stacked_results_chart(
         combined_all_20_dfs,
         combined_all_20_labels,
-        "gpt_oss_20b_all_problems.pdf",
+        "gpt_oss_20b_all_problems.png",
         boundaries=[5, 7],
     )
     sum = 0
@@ -447,7 +453,7 @@ if __name__ == "__main__":
     make_stacked_results_chart(
         combined_all_20_optimized_dfs,
         combined_all_20_optimized_labels,
-        "gpt_oss_20b_all_problems_optimized.pdf",
+        "gpt_oss_20b_all_problems_optimized.png",
         boundaries=[5, 7],
     )
     sum = 0
@@ -477,7 +483,7 @@ if __name__ == "__main__":
         "no_plan_feedback",
         "no_feedback",
     ]
-    make_stacked_results_chart(dfs, x_labels, "tool_ablations.pdf", 5)
+    make_stacked_results_chart(dfs, x_labels, "tool_ablations.png", 6)
     print("# Tool ablations")
     print("Applicable base", add_result_cols(ring_and_peg_1_120)[-1])
     print(
@@ -516,7 +522,7 @@ if __name__ == "__main__":
         "solvability_full",
         "solvability_abstraction",
     ]
-    make_stacked_results_chart(dfs, x_labels, "solvability_ablations.pdf", 6)
+    make_stacked_results_chart(dfs, x_labels, "solvability_ablations.png", 7)
     print("# Feedback ablations")
     print("Third stage base", add_result_cols(solvability_base)[-2])
     print("Second stage base", add_result_cols(solvability_base)[-3])
@@ -539,7 +545,7 @@ if __name__ == "__main__":
         "tool_call",
         "rigid_trajectory",
     ]
-    make_stacked_results_chart(dfs, x_labels, "tool_call_rigid_comparison.pdf", 4)
+    make_stacked_results_chart(dfs, x_labels, "tool_call_rigid_comparison.png", 5)
     print("# Pipelines")
     print("Num applicable rigid_trajectory:", add_result_cols(rigid_trajectory)[-1])
     print("Num applicable tool_call:", add_result_cols(tool_call)[-1])
@@ -611,7 +617,7 @@ if __name__ == "__main__":
     make_stacked_results_chart(
         dfs,
         x_labels,
-        "gemini_3_flash_all_problems.pdf",
+        "gemini_3_flash_all_problems.png",
         boundaries=[5, 7],
     )
     sum = 0
@@ -690,7 +696,7 @@ if __name__ == "__main__":
     make_stacked_results_chart(
         dfs,
         x_labels,
-        "gemini_3_flash_image_all_problems.pdf",
+        "gemini_3_flash_image_all_problems.png",
         boundaries=[5, 7],
     )
     sum = 0
@@ -700,4 +706,49 @@ if __name__ == "__main__":
     print(
         "gemini-3-flash image needle_transfer_1",
         add_result_cols(needle_transfer_1_gemini_3_flash_image)[-1],
+    )
+
+    # Aggregate across all tested domains/problems for all model instances
+    all_models_dfs = [
+        pl.concat(combined_all_20_dfs),
+        pl.concat(combined_all_20_optimized_dfs),
+        pl.concat(combined_all_120_dfs),
+        pl.concat([
+            ring_and_peg_1_gemini_3_flash,
+            ring_and_peg_2_gemini_3_flash,
+            ring_and_peg_3_gemini_3_flash,
+            ring_and_peg_4_gemini_3_flash,
+            ring_and_peg_5_gemini_3_flash,
+            needle_transfer_1_gemini_3_flash,
+            needle_transfer_2_gemini_3_flash,
+            needle_sorting_1_gemini_3_flash,
+            needle_sorting_2_gemini_3_flash,
+            needle_sorting_3_gemini_3_flash,
+        ]),
+        pl.concat([
+            ring_and_peg_1_gemini_3_flash_image,
+            ring_and_peg_2_gemini_3_flash_image,
+            ring_and_peg_3_gemini_3_flash_image,
+            ring_and_peg_4_gemini_3_flash_image,
+            ring_and_peg_5_gemini_3_flash_image,
+            needle_transfer_1_gemini_3_flash_image,
+            needle_transfer_2_gemini_3_flash_image,
+            needle_sorting_1_gemini_3_flash_image,
+            needle_sorting_2_gemini_3_flash_image,
+            needle_sorting_3_gemini_3_flash_image,
+        ]),
+    ]
+    all_models_labels = [
+        "gpt-oss-20b",
+        "gpt-oss-20b-optimized",
+        "gpt-oss-120b",
+        "gemini-3-flash",
+        "gemini-3-flash-image",
+    ]
+    make_stacked_results_chart(
+        all_models_dfs,
+        all_models_labels,
+        "all_models_all_problems.png",
+        chart_width=8,
+        y_limit=310,
     )

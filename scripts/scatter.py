@@ -28,15 +28,15 @@ if __name__ == "__main__":
             xytext=(0, 10),
             va="bottom",
             ha="center",
-            fontsize=9,
+            fontsize=11,
         )
 
-    plt.xlabel("$/100k tokens")
-    plt.ylabel("Success rate ring_and_peg_1")
+    plt.xlabel("$/100k tokens", fontsize=11)
+    plt.ylabel("Success rate for ring_and_peg_1", fontsize=11)
     plt.ylim(0, 1.01)
     plt.xlim(-2, 29)
     plt.gca().set_axisbelow(True)
     plt.grid(True, which="major", axis="both", linestyle="-", linewidth=0.6, alpha=0.25)
 
     plt.tight_layout()
-    plt.savefig(charts_dir / "large_cs_scatter.pdf", bbox_inches="tight")
+    plt.savefig(charts_dir / "large_cs_scatter.png", bbox_inches="tight")
