@@ -1,6 +1,12 @@
 # pddl_pipeline
 
-Code repository for master thesis 'Automated PDDL Generation Using Large Language Models for Task Planning in Surgical Robotics'
+Code repository for my master thesis 'Automated PDDL Generation Using Large Language Models for Task Planning in Surgical Robotics'. 
+
+The approach proposed in this thesis consists of a pipeline for the autonomous generation of PDDL files from NL and image input with the use of LLMs.
+To verify the applicability of plans produced from the generated PDDL files, we provide a set of simulation environments to which the plans can be applied in [surgical-pddl-sim](https://github.com/vDawgg/surgical-pddl-sim).
+
+In addition to the core pipeline, we also provide a small ```NL to PDDL``` dataset based on [pddlgym](https://github.com/tomsilver/pddlgym) with gym environments for each problem instance to allow for the verification of generated plans.
+This dataset can be used with [GEPA](https://github.com/gepa-ai/gepa) optimization to further improve the pipeline prompts.
 
 ## Local Setup
 
@@ -28,9 +34,12 @@ uv run eval.py --model gpt_oss_120b --pipeline tool_call --domain ring_and_peg -
 
 The results for each run are then written as a csv-file to the [results](./results/) directory. Likewise the generated plans (if any), logs and pddl files are written to the directories of their matching names.
 
+To start a GEPA optimization run, the ```--optimize``` flag needs to be set.
+The optimized prompts of this run can then be used in later pipeline executions by specifying the corresponding results file (json) with the ```--optimized_program``` flag.
+
 ### Docker
 
-For inference on local hardware, we provide a set of [llama-cpp-server]() configurations which can be run using docker-compose. To start up the server running e.g. gemma-4-e4b, run ```docker compose --profile gemma_4_e4b up -d``` and wait until the service is healthy.
+For inference on local hardware, we provide a set of [llama-cpp-server](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md) configurations which can be run using docker-compose. To start up the server running e.g. gemma-4-e4b, run ```docker compose --profile gemma_4_e4b up -d``` and wait until the service is healthy.
 
 The pipeline can then be started by runninng the command below. Note that the container always runs the eval script for the pipeline and accepts the same arguments as the script when its run locally.
 
